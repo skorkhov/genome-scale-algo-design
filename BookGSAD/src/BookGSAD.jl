@@ -3,7 +3,6 @@ module BookGSAD
 using Random
 using StatsBase
 
-# include("intro.jl")
-include("binary_heap.jl")
+include("intro.jl")
 
 end # module BookGSAD
