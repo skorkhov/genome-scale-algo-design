@@ -70,3 +70,80 @@ ds.push!(root, -1, "A")
 # and hence cannot be dropped.
 # To delete root, need a separate tree types that would store 
 # the reference to first node.
+
+
+# =======
+# Red-Black Trees
+
+import DS as ds
+
+tree = ds.RBTreeNode(1, "a")
+ds.push!(tree, 2, "b")
+ds.push!(tree, 3, "c")
+ds.push!(tree, 4, "d")
+ds.push!(tree, 2, "B")
+ds.push!(tree, -1, "A")
+ds.push!(tree, -2, "B")
+ds.push!(tree, -3, "C")
+
+ds.getnode(tree, 1)
+ds.get(tree, 1)
+ds.get(tree, -99)
+
+
+tree = ds.RBTreeNode(1, "a")
+tree.right = ds.RBTreeNode(2, "b")
+tree.left = ds.RBTreeNode(-1, "A")
+
+tree_left = ds.rotate_left!(deepcopy(tree))
+tree_right = ds.rotate_right!(deepcopy(tree))
+
+ds.pushr!(tree, 3, "c")
+ds.pushr!(tree, 4, "d")
+ds.pushr!(tree, -2, "B")
+ds.pushr!(tree, -3, "C")
+
+tree = ds.RBTreeNode(1, "a")
+ds.pushr!(tree, 3, "c")
+ds.pushr!(tree, 4, "d")
+ds.pushr!(tree, -2, "B")
+ds.pushr!(tree, -3, "C")
+
+
+# check color preservation for rotate_left!()
+tree = ds.RBTreeNode(1, "a")
+tree.right = ds.RBTreeNode(2, "b")
+tree.right.color = true
+
+nd = ds.rotate_left!(deepcopy(tree))
+nd.color
+nd.left.color
+
+
+# check color preservation for rotate_left!()
+tree = ds.RBTreeNode(1, "a")
+tree.left = ds.RBTreeNode(2, "b")
+tree.left.color = true
+
+nd = ds.rotate_right!(deepcopy(tree))
+nd.color  # false
+nd.right.color  # true
+
+# random input:
+# append random pairs
+using StatsBase
+Random.seed!(1)
+letters = Dict(i => ('A':'Z')[i] for i in sample(1:26, 26, replace = false))
+
+tree = ds.RBTreeNode(0, '_')
+for (key, val) in letters
+    tree = ds.pushr!(tree, key, val)
+end
+
+# ordered input:
+tree = ds.RBTreeNode(0, '_')
+for (key, val) in Dict(i => ('a':'z')[i] for i in 1:26)
+    tree = ds.pushr!(tree, key, val)
+end
+
+

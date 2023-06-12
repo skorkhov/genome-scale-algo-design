@@ -1,7 +1,5 @@
 import Base: push!, get, pop!
 
-abstract type AbstractNode end
-
 # =======
 # BST Node using Self as a sentinel for nothing
 
@@ -126,7 +124,7 @@ function popmin!(root::BSTNodeSelf)
 end
 
 # Returns value associated with the key and removes it from the tree
-function pop!(node::BSTNodeSelf, key) 
+function pop!(node::BSTNodeSelf{T}, key::T) where T
     toremove = find_node(node, key)
     toremove.key == key || return nothing
 
