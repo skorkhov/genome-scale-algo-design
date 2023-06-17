@@ -78,13 +78,13 @@ ds.push!(root, -1, "A")
 import DS as ds
 
 tree = ds.RBTreeNode(1, "a")
-ds.push!(tree, 2, "b")
-ds.push!(tree, 3, "c")
-ds.push!(tree, 4, "d")
-ds.push!(tree, 2, "B")
-ds.push!(tree, -1, "A")
-ds.push!(tree, -2, "B")
-ds.push!(tree, -3, "C")
+ds.pushr!(tree, 2, "b")
+ds.pushr!(tree, 3, "c")
+ds.pushr!(tree, 4, "d")
+ds.pushr!(tree, 2, "B")
+ds.pushr!(tree, -1, "A")
+ds.pushr!(tree, -2, "B")
+ds.pushr!(tree, -3, "C")
 
 ds.getnode(tree, 1)
 ds.get(tree, 1)
@@ -132,18 +132,50 @@ nd.right.color  # true
 # random input:
 # append random pairs
 using StatsBase
+using Random
 Random.seed!(1)
 letters = Dict(i => ('A':'Z')[i] for i in sample(1:26, 26, replace = false))
 
+# ordered input:
+tree = ds.RBTreeNode(0, '_')
+for (key, val) in Dict(i => ('a':'z')[i] for i in 1:3)
+    tree = ds.pushr!(tree, key, val)
+end
+tree.color = false
+nd = deepcopy(tree)
+
+# random input:
 tree = ds.RBTreeNode(0, '_')
 for (key, val) in letters
     tree = ds.pushr!(tree, key, val)
 end
-
-# ordered input:
-tree = ds.RBTreeNode(0, '_')
-for (key, val) in Dict(i => ('a':'z')[i] for i in 1:26)
-    tree = ds.pushr!(tree, key, val)
-end
+tree.color = false
 
 
+ds.valid_rbtree_node(tree)
+ds.valid_rbtree(tree)
+ds.compute_black_height(tree)
+
+# create object copies: 
+nd = deepcopy(tree)
+node_bottom = deepcopy(nd.left.left)
+
+# check removal of nodes: 
+ds.get(nd, 0)
+ds.get(nd, 1)
+nd = ds.popmin!(nd)
+ds.valid_rbtree(nd)
+ds.compute_black_height(nd)
+ds.get(nd, 0)
+ds.get(nd, 1)
+nd = ds.popmin!(nd)
+ds.valid_rbtree(nd)
+ds.compute_black_height(nd)
+ds.get(nd, 0)
+ds.get(nd, 1)
+ds.get(nd, 2)
+nd = ds.popmin!(nd)
+ds.get(nd, 0)
+ds.get(nd, 1)
+ds.get(nd, 2)
+nd = ds.popmin!(nd)

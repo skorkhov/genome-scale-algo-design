@@ -289,7 +289,6 @@ function poprec!(node::BSTNode{T}, key::T) where T
         # if noth children exist
         # construct a new node: 
         rightmin = find_min(node.right)
-        @show rightmin.value, rightmin
         rightmin.right = poprec_min!(node.right)
         rightmin.left = node.left
         node = rightmin
