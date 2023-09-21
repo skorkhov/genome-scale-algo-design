@@ -20,4 +20,5 @@ RUN julia -e 'using Pkg; Pkg.add.("GraphRecipes")'
 # RUN julia -e 'using Pkg; Pkg.add.("Bio")'
 
 # push local package paths: 
-RUN echo 'push!(LOAD_PATH, pwd() * "/BookGSAD")' >> ~/.julia/config/startup.jl
+RUN echo 'push!(LOAD_PATH, pwd() * "/BookGSAD")' >> ~/.julia/config/startup.jl 
+RUN echo 'push!(LOAD_PATH, pwd() * "/DS")' >> ~/.julia/config/startup.jl
