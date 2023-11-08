@@ -1,4 +1,5 @@
-
+using Random
+using StatsBase
 
 protein_codon_dict = Dict(
     'A' => ["GCT", "GCC", "GCA", "GCG"], 

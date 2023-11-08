@@ -17,8 +17,13 @@ RUN julia -e 'using Pkg; Pkg.add.("SimpleWeightedGraphs")'
 RUN julia -e 'using Pkg; Pkg.add.("Plots")'
 RUN julia -e 'using Pkg; Pkg.add.("GraphRecipes")'
 
+# misc libs
+RUN julia -e 'using Pkg; Pkg.add.("IndexableBitVectors")'
+RUN julia -e 'using Pkg; Pkg.add.("BenchmarkTools")'
+RUN julia -e 'using Pkg; Pkg.add.("Pluto")'
+
 # RUN julia -e 'using Pkg; Pkg.add.("Bio")'
 
 # push local package paths: 
-RUN echo 'push!(LOAD_PATH, pwd() * "/BookGSAD")' >> ~/.julia/config/startup.jl 
-RUN echo 'push!(LOAD_PATH, pwd() * "/DS")' >> ~/.julia/config/startup.jl
+#RUN echo 'push!(LOAD_PATH, pwd() * "/BookGSAD")' >> ~/.julia/config/startup.jl 
+#RUN echo 'push!(LOAD_PATH, pwd() * "/DS")' >> ~/.julia/config/startup.jl
