@@ -1,8 +1,8 @@
-using BookGSAD
+using GSAD
 using Test
 
 # define shortcut to module 
-M = BookGSAD
+M = GSAD
 
 @testset "Slow Reference Implementations" begin
     include("test-slow_reference.jl")

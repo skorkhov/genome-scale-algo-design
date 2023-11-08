@@ -168,17 +168,17 @@ ints_small = rand(0:(2^30), 1000);
 # Experiment - comapre my rank with one from IndexableBitVectors
 using Random
 using BenchmarkTools
-using IndexableBitVectors, BookGSAD
+using IndexableBitVectors, GSAD
 
 Random.seed!(1)
 bv = bitrand(1_000_000)
 bv1 = SucVector(bv)
 bv2 = IdxBitVector(bv)
 
-@btime BookGSAD.rank_slow($bv, 9_000);
+@btime GSAD.rank_slow($bv, 9_000);
 @btime IndexableBitVectors.rank1($bv1, 9_000);
-@btime BookGSAD.rank1($bv2, 9_000);
+@btime GSAD.rank1($bv2, 9_000);
 
-@btime BookGSAD.rank_slow($bv, 90_000);
+@btime GSAD.rank_slow($bv, 90_000);
 @btime IndexableBitVectors.rank1($bv1, 90_000);
-@btime BookGSAD.rank1($bv2, 90_000);
+@btime GSAD.rank1($bv2, 90_000);

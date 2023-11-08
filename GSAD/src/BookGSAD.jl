@@ -1,4 +1,4 @@
-module BookGSAD
+module GSAD
 
 include("intro.jl")
 include("slow_reference.jl")
@@ -13,4 +13,4 @@ export
     # methods:
     rank1
 
-end # module BookGSAD
+end # module GSAD
