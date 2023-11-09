@@ -152,3 +152,28 @@ function rank1(v::IdxBitVector, i)
     rank_cache_long + rank_cache_short + rank_in_chunk
 end
 
+
+# "slow" select with binary search using rank1: log(n) time
+function select1(v::IdxBitVector, j)
+    hi = length(v)
+    lo = 0
+    r_max = rank1(v, hi)
+    if j <= 0 || j > r_max
+        throw(BoundsError("rank(v, length(v))=$max; attempting to access $j"))
+    end
+
+    mid = div(hi + lo, 2)
+    while lo < hi || v.v[mid] != 1
+        mid = div(hi + lo, 2)
+        r = rank1(v, mid)
+        # ensure correct index always stays in [lo, hi]
+        if r >= j
+            hi = mid
+        else r < j
+            lo = mid + 1
+        end
+    end
+
+    mid
+end
+

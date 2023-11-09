@@ -11,6 +11,7 @@ export
     # types:
     IdxBitVector, 
     # methods:
-    rank1
+    rank1,
+    select1
 
 end # module GSAD

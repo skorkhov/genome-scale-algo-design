@@ -75,4 +75,22 @@ end
     @test rank_slow(v.v, 200) == rank1(v, 200)
 end
 
+@testset "select1(::IdxBitVector, j)" begin
+    bitvector = BitVector([1, 1, 1, 0, 0, 1, 0, 0])
+    v = IdxBitVector(bitvector)
+    @test select1(v, 4) == 6
+    @test select1(v, 1) == 1
+    @test select1(v, 2) == 2
+    @test select1(v, 3) == 3
+
+    # bitvector long enough to grab all chunks: 
+    s1 = [BitVector([1, 1, 0, 1, 1, 0]); falses(58)]
+    s2 = [BitVector([0, 0, 1]); falses(61)]
+    s5 = BitVector([0, 0, 0, 1])
+    bitvector = [s1; s2; falses(64); falses(64); s5]
+    v = IdxBitVector(bitvector)
+    @test select1(v, 4) == 5
+    @test select1(v, 5) == 67
+end
+
 
