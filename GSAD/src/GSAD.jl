@@ -6,8 +6,6 @@ include("bitvec.jl")
 
 # exports:
 export 
-    # slow reference methods: 
-    rank_slow,
     # types:
     IdxBitVector, 
     # methods:

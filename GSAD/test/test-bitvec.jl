@@ -71,8 +71,8 @@ end
     # for some
     bitvector = bitrand(1_000_000)
     v = IdxBitVector(bitvector)
-    @test rank_slow(v.v, 55) == rank1(v, 55)
-    @test rank_slow(v.v, 200) == rank1(v, 200)
+    @test rank1(v.v, 55) == rank1(v, 55)
+    @test rank1(v.v, 200) == rank1(v, 200)
 end
 
 @testset "select1(::IdxBitVector, j)" begin

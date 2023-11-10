@@ -1,5 +1,5 @@
 
-function rank_slow(v::BitVector, i::Int, c::Int=1)
+function rank1(v::BitVector, i::Int, c::Int=1)
     # throw error when index out of bounds
     (i < 0 || i > length(v)) && throw(BoundsError(v, i))
 
