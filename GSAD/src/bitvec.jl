@@ -156,10 +156,10 @@ end
 # "slow" select with binary search using rank1: log(n) time
 function select1(v::IdxBitVector, j)
     hi = length(v)
-    lo = 0
+    lo = 1
     r_max = rank1(v, hi)
     if j <= 0 || j > r_max
-        throw(BoundsError("rank(v, length(v))=$max; attempting to access $j"))
+        throw(BoundsError("rank(v, length(v))=$r_max; attempting to access $j"))
     end
 
     mid = div(hi + lo, 2)
@@ -174,6 +174,6 @@ function select1(v::IdxBitVector, j)
         end
     end
 
-    mid
+    lo
 end
 

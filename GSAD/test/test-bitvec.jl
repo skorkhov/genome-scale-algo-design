@@ -79,9 +79,12 @@ end
     bitvector = BitVector([1, 1, 1, 0, 0, 1, 0, 0])
     v = IdxBitVector(bitvector)
     @test select1(v, 4) == 6
+    # catching edge cases at low counts: 
     @test select1(v, 1) == 1
     @test select1(v, 2) == 2
     @test select1(v, 3) == 3
+
+    @test_throws BoundsError select1(v, 10)
 
     # bitvector long enough to grab all chunks: 
     s1 = [BitVector([1, 1, 0, 1, 1, 0]); falses(58)]
