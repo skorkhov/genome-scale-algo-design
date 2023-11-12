@@ -68,11 +68,20 @@ end
     @test 5 == rank1(v, 257)
     @test 6 == rank1(v, 260)
 
-    # for some
     bitvector = bitrand(1_000_000)
     v = IdxBitVector(bitvector)
     @test rank1(v.v, 55) == rank1(v, 55)
     @test rank1(v.v, 200) == rank1(v, 200)
+
+    # test for bitvector longer than 2^32
+    # in this case, 
+    # each long cached rank is stored in both long and short rank tables
+    len = 2^32 + 3
+    bitvector = trues(len)
+    v = IdxBitVector(bitvector)
+    @test rank1(v, 1000) == UInt64(1000)
+    @test rank1(v, 2^32 + 1) == UInt64(2^32 + 1)
+
 end
 
 @testset "select1(::IdxBitVector, j)" begin

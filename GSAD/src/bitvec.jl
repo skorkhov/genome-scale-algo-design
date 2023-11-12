@@ -144,11 +144,18 @@ function rank1(v::IdxBitVector, i)
     ilong = div(i, BLOCK_WIDTH_LONG)
     ishort = div(i, BLOCK_WIDTH_SHORT)
 
-    # TODO: handle small chunks that aligh with the short one.
+    # each cached rank of a long chunk is stored in two arrays: 
+    # first 8 bits in the aligned short chunk table
+    # last 32 bits in the long chunk table
+    ishort_first8 = ilong * N_SHORT_PER_LONG
+    rank_cache_long_first8 = ishort_first8 > 0 ? v.short[ishort_first8] : UInt8(0)
+    rank_cache_long_last32 = ilong > 0 ? v.long[ilong] : 0
+    rank_cache_long = UInt64(rank_cache_long_first8) << 32 + rank_cache_long_last32
+    
+    # every N_SHORT_PER_LONG'th short chunk stores long cache - ignore
+    rank_cache_short = ishort % N_SHORT_PER_LONG == 0 ? 0 : v.short[ishort]
     rank_in_chunk = rank_within_uint64(v.v.chunks[ishort + 1], i % 64)
-    rank_cache_long = ilong > 0 ? v.long[ilong] : 0
-    rank_cache_short = ishort > 0 ? v.short[ishort] : 0
-
+    
     rank_cache_long + rank_cache_short + rank_in_chunk
 end
 
