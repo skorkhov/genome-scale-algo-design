@@ -11,3 +11,9 @@ end
 @testset "Rank and Select" begin
     include("test-bitvec.jl")
 end
+
+
+@testset "BitCache" begin
+    include("test-bitcache.jl")
+end
+

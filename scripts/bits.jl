@@ -165,7 +165,7 @@ ints_small = rand(0:(2^30), 1000);
 @btime h.($ints_small);
 
 
-# Experiment - comapre my rank with one from IndexableBitVectors
+# Experiment - compare my rank with one from IndexableBitVectors
 using Random
 using BenchmarkTools
 using IndexableBitVectors, GSAD
@@ -175,10 +175,29 @@ bv = bitrand(1_000_000)
 bv1 = SucVector(bv)
 bv2 = IdxBitVector(bv)
 
-@btime GSAD.rank_slow($bv, 9_000);
-@btime IndexableBitVectors.rank1($bv1, 9_000);
-@btime GSAD.rank1($bv2, 9_000);
+i = 9_000
+@btime GSAD.rank1($bv, $i);
+@btime IndexableBitVectors.rank1($bv1, $i);
+@btime GSAD.rank1($bv2, $i);
 
-@btime GSAD.rank_slow($bv, 90_000);
-@btime IndexableBitVectors.rank1($bv1, 90_000);
-@btime GSAD.rank1($bv2, 90_000);
+i = 90_000
+@btime GSAD.rank1($bv, $i);
+@btime IndexableBitVectors.rank1($bv1, $i);
+@btime GSAD.rank1($bv2, $i);
+
+i = 900_000
+@btime GSAD.rank1($bv, $i);
+@btime IndexableBitVectors.rank1($bv1, $i);
+@btime GSAD.rank1($bv2, $i);
+
+# veery long vector:
+Random.seed!(1)
+len = 2^32 + 3
+bv = bitrand(len)
+bv1 = SucVector(bv)
+bv2 = IdxBitVector(bv)
+
+i = 2^32 + 1
+@btime GSAD.rank1($bv, $i);
+@btime IndexableBitVectors.rank1($bv1, $i);
+@btime GSAD.rank1($bv2, $i);

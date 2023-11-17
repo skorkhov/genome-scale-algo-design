@@ -183,4 +183,3 @@ function select1(v::IdxBitVector, j)
 
     lo
 end
-
