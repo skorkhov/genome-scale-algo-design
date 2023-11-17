@@ -17,15 +17,20 @@ nbits(n) = 2 ^ n - 1
     @test bc.cache == cache_ui64
 end
 
-@testset "cache_offset(::BitCache64)" begin
+@testset "lookup_offset(::BitCache64)" begin
     chunks = Tuple(UInt64[0, 0, nbits(6), 0])
     bc = BitCache64(chunks)
-    @test M.cache_offset(bc, 0) == UInt64(0)
-    @test M.cache_offset(bc, 3) == UInt64(6)
+    @test M.lookup_offset(bc, 0) == UInt64(0)
+    @test M.lookup_offset(bc, 3) == UInt64(6)
 
     chunks = Tuple(UInt64[0, 0, nbits(6), 0])
-    bc = BitCache64(chunks, 100)
-    @test M.cache_offset(bc, 0) == UInt64(100)
-    @test M.cache_offset(bc, 3) == UInt64(100 + 6)
+    bc = BitCache64(chunks)
+    @test M.lookup_offset(bc, 0) == UInt64(0)
+    @test M.lookup_offset(bc, 3) == UInt64(6)
+
+    M.add_offset!(bc, 100)
+    @test M.lookup_offset(bc, 0) == UInt64(100)
+    @test M.lookup_offset(bc, 3) == UInt64(100 + 6)
+    
 end
 
