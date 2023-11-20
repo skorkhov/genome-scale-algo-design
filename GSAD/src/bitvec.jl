@@ -1,4 +1,4 @@
-"""
+#=
 # Theory from Genome-Scale Algorithm Design
 
 v = BitVector, length(v) = n
@@ -68,7 +68,7 @@ It makes sense to pick such intervals that holds(.) are powers of two. Pick the
 smallest available integer size for holds(2nd): 8 bits (UInt8). Then, to 
 accommodate a sufficiently large bitvector, holds(1st) = 32 bits (UInt32). With 
 such choices, h'(1st) = 40 bits, allowing bitvector to be >100 GB.
-"""
+=#
 
 abstract type AbstractIdxBitVector <: AbstractVector{Bool} end
 
@@ -108,7 +108,6 @@ struct IdxBitVector <: AbstractIdxBitVector
         long = Vector{UInt32}(undef, div(n, BLOCK_WIDTH_LONG))
         short = Vector{UInt8}(undef, div(n, BLOCK_WIDTH_SHORT))
     
-    
         overall = 0 
         relative = 0
         for sth in eachindex(short)
@@ -132,6 +131,7 @@ end
 
 Base.length(v::IdxBitVector) = length(v.v)
 Base.size(v::IdxBitVector) = (length(v),)
+Base.convert(::Type{BitVector}, x::IdxBitVector) = x.v
 
 Base.show(io::IO, x::IdxBitVector) = Base.show(io, x.v)
 # for some reason is necessary to make printing work in the terminal: 

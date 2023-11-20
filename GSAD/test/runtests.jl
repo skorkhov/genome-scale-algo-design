@@ -5,15 +5,21 @@ using Test
 M = GSAD
 
 @testset "Slow Reference Implementations" begin
-    include("test-slow_reference.jl")
+    include("test-reference.jl")
 end
 
-@testset "Rank and Select" begin
-    include("test-bitvec.jl")
+@testset "bit utils" begin
+    include("test-bitutils.jl")
 end
 
-
-@testset "BitCache" begin
-    include("test-bitcache.jl")
+@testset "IdxBitVector()" begin
+    include("test-IdxBitVector.jl")
 end
 
+@testset "CachedBitVector()" begin
+    include("test-CachedBitVector.jl")
+end
+
+@testset "rank(::T) and select(::T) where T <: Bit Vector" begin
+    include("test-bitvec-ops.jl")
+end

@@ -1,7 +1,8 @@
 module GSAD
 
 include("intro.jl")
-include("slow_reference.jl")
+include("reference.jl")
+include("bitutils.jl")
 include("bitvec.jl")
 include("bitcache.jl")
 
@@ -9,7 +10,7 @@ include("bitcache.jl")
 export 
     # types:
     IdxBitVector, 
-    BitCache64,
+    CachedBitVector,
     # methods:
     rank1,
     select1
