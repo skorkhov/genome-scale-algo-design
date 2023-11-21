@@ -1,7 +1,4 @@
 
-"""
-
-"""
 mutable struct BitCache64
     cache::UInt64
 
@@ -9,6 +6,8 @@ mutable struct BitCache64
     BitCache64(cache::UInt64) = new(cache)
     BitCache64(cache) = new(convert(UInt64, cache))
 end
+
+Base.zero(::Type{BitCache64}) = BitCache64()
 
 """
 offset_cache(int::Unsigned, bits::Integer)
@@ -35,7 +34,7 @@ Return `int` with 8 least significant `bits` stored at `8(i-1)` right offset.
 Position `i` is clamped to be in [1,3], but no checks on the width of `bits` are
 performed.
 """
-@inline function push_cache(int::Unsigned, i::Integer, bits::Integer) 
+function push_cache(int::Unsigned, i::Integer, bits::Integer) 
     # TODO: test with clamp() vs throw error
     i = clamp(i, 1, 3)
     # i in 0:3 || throw(BoundsError("only indexes i in 0:3 settable; i=$i"))
@@ -61,6 +60,15 @@ function push_cache!(cache::BitCache64, i::Integer, bits::Integer)
     return nothing
 end
 
+"get cached values for index `i`"
+@inline function get_cache(cache::BitCache64, i) 
+    int = cache.cache
+    ifelse(
+        i == 0, 
+        int >> 24, 
+        int >> 24 + (int >> (24 - 8i)) % UInt8
+    )
+end
 
 """
     CachedBitVector
@@ -69,105 +77,53 @@ A bit vector with additional data for O(1) `rank()` and `select()`.
 
 See also: [`IndexedBitVector`](@ref)
 """
-struct CachedBitVector
+mutable struct CachedBitVector <: AbstractIdxBitVector
     bits::BitVector
     cache::Vector{BitCache64}
     
     function CachedBitVector(bits::BitVector)
         n = length(bits)
-        n_cache = cld(n, BLOCK_WIDTH_LONG)
-        n_short = div(n, BLOCK_WIDTH_SHORT)
-        cache = Vector{BitCache64}(BitCache64(), n_cache)
+        n_short = fld(n, BLOCK_WIDTH_SHORT)       # short block caches stored
+        # n_cache = cld(n_short, N_SHORT_PER_LONG)
+        n_cache = fld(n_short, N_SHORT_PER_LONG) + 1
+        cache = [BitCache64() for _ in 1:n_cache]
     
         overall = 0
         relative = 0
-        for i_short in 1:n_short
-            i_long = cld(i_short, N_SHORT_PER_LONG)
-            
+        for current_short in 1:n_short
+            current_long = fld(current_short, N_SHORT_PER_LONG) + 1
             # use relative index of short block in long
             # to decide where to store the rank in the cache obj:
-            i = i_short % N_SHORT_PER_LONG
+            i = current_short % N_SHORT_PER_LONG
+            
+            relative += count_ones(bits.chunks[current_short])
             if i == 0
-                offset_cache!(cache[i_long], overall) 
+                # in the first chunk of a long block
+                overall += relative
+                offset_cache!(cache[current_long], overall) 
                 relative = 0
             else 
-                push_cache!(cache[i_long], i, relative)
+                push_cache!(cache[current_long], i, relative)
             end
-    
-            relative += count_ones(bits.chunks[i_short])
-            overall += relative
         end
     
         new(bits, cache)
     end
 end
 
+Base.length(v::CachedBitVector) = length(v.bits)
+Base.size(v::CachedBitVector) = (length(v),)
 Base.convert(::Type{BitVector}, x::CachedBitVector) = x.bits
 
+Base.show(io::IO, x::CachedBitVector) = Base.show(io, x.bits)
+# for some reason is necessary to make printing work in the terminal: 
+Base.show(io::IO, ::MIME"text/plain", z::CachedBitVector) = print(io, "CachedBitVector: ", z.bits)
 
 function rank1(v::CachedBitVector, i::Integer)
-    # i = clamp(i, 1, length(v))
-    i_short, pos = divrem(i, BLOCK_WIDTH_SHORT)
-    i_long = cld(i_short, N_SHORT_PER_LONG)
-    i = i_short % N_SHORT_PER_LONG
-    get_cache(v.cache[i_long], i) + v.chunks[i_short + 1] << (64 - pos)
+    stored_short, pos = divrem(i, BLOCK_WIDTH_SHORT)
+    stored_long = fld(stored_short, N_SHORT_PER_LONG) + 1
+
+    idx_in_cache = stored_short % N_SHORT_PER_LONG
+    rank_in_chunk = count_ones(v.bits.chunks[stored_short + 1] << (64 - pos))
+    get_cache(v.cache[stored_long], idx_in_cache) + rank_in_chunk
 end
-
-
-#=
-function add_offset!(cache::BitCache64, offset)
-    offset >= 2^40 && throw(ArgumentError("offset should be below 2^40: log2(offset)=$(log2(offset))"))
-    cache.cache = cache.cache + (offset % UInt64) << 24
-end
-
-function lookup_offset(cache::BitCache64, sbl) 
-    sbl in 0:3 || throw(BoundsError("sbl has to be between 0 and 4; given $sbl"))
-    l = cache.cache >>> 24
-
-    if sbl == 0 
-        return l
-    end
-
-    s = cache.cache >>> (8 * (3 - sbl)) 
-    s = s % UInt8
-
-    return l + s
-end
-
-struct CachedBitVector
-    bits::BitVector
-    cache::Vector{BitCache64}
-    
-    function CachedBitVector(bv::BitVector)
-        n = length(bv)
-        # lbs = ceil(n, BLOCK_WIDTH_LONG)
-        sbs = ceil(n, BLOCK_WIDTH_SHORT)
-        cache = Vector{BitCache64}(undef, lbs)
-
-        offset = 0 
-        for sbl in 1:4:sbs
-            sbu = min(sbs, sbl + 2)
-            count_ones.(bc.chunks[sbl:sbu])
-        end
-        
-        offset = 0
-        for lb in 1:lbs
-            # small block indexes included in large block
-            sbl = (lb - 1) * N_SHORT_PER_LONG + 1
-            sbu = lb == lbs ? sbs : lb * N_SHORT_PER_LONG
-            chunks = @view bv.chunks[sbl:sbu]
-            
-            # add compile block
-            lbcache = BitCache64(Tuple(chunks))
-            add_offset!(lbcache, offset)
-            cache[lb] = lbcache
-            
-            # increment offset:
-            offset += sum(count_ones.(chunks))
-        end
-
-        new(bv, cache)
-    end
-end
-=#
-

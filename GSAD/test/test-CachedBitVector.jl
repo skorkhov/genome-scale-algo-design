@@ -39,8 +39,46 @@ end
 
 
 @testset "CachedBitVector" begin
+    bitvector = BitVector([1, 0, 0])
+    v = CachedBitVector(bitvector)
     
+    @test v.bits == bitvector
+    @test length(v.cache) == 1
+    @test v.cache[1].cache == GSAD.BitCache64().cache
+
+    # for longer vector that uses cache: 
+    v = make_bitvec_5chunk(CachedBitVector)
+    # first cache: 
+    c1 = GSAD.BitCache64()
+    GSAD.push_cache!(c1, 1, 4)
+    GSAD.push_cache!(c1, 2, 5)
+    GSAD.push_cache!(c1, 3, 5)
+    c2 = GSAD.BitCache64()
+    GSAD.offset_cache!(c2, 5)
+
+    @test length(v.cache) == 2
+    @test v.cache[1].cache == c1.cache
+    @test v.cache[2].cache == c2.cache
 end
 
+
+# @testset "rank1(::CachedBitVector)" begin
+#     v = make_bitvec_small(CachedBitVector)
+#     @test rank1(v, 2) == 2
+#     @test rank1(v, 3) == 3
+#     @test rank1(v, 4) == 3
+#     @test rank1(v, 8) == 4
+
+#     # long vector with 5 chunks
+#     v = make_bitvec_5chunk(CachedBitVector)
+#     @test rank1(v, 2) == 2
+#     @test rank1(v, 3) == 2
+#     # second short chunk:
+#     @test rank1(v, 65) == 4
+#     @test rank1(v, 67) == 5
+#     # rigth after long chunk:
+#     @test rank1(v, 257) == 5
+#     @test rank1(v, 260) == 6
+# end
 
 

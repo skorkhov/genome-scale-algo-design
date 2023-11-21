@@ -10,6 +10,7 @@ include("bitcache.jl")
 export 
     # types:
     IdxBitVector, 
+    BitCache64,
     CachedBitVector,
     # methods:
     rank1,
