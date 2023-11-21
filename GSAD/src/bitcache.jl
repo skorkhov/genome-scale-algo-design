@@ -115,7 +115,7 @@ Base.length(v::CachedBitVector) = length(v.bits)
 Base.size(v::CachedBitVector) = (length(v),)
 Base.convert(::Type{BitVector}, x::CachedBitVector) = x.bits
 
-Base.show(io::IO, x::CachedBitVector) = Base.show(io, x.bits)
+Base.show(io::IO, x::CachedBitVector) = Base.print(x.bits)
 # for some reason is necessary to make printing work in the terminal: 
 Base.show(io::IO, ::MIME"text/plain", z::CachedBitVector) = print(io, "CachedBitVector: ", z.bits)
 
