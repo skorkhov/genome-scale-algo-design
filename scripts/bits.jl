@@ -174,7 +174,7 @@ Random.seed!(1)
 bv = bitrand(1_000_000)
 bv0 = convert(IndexableBitVectors.CompactBitVector, bv)
 bv1 = SucVector(bv)
-bv2 = IdxBitVector(bv)
+bv2 = RankedBitVector(bv)
 bv3 = CachedBitVector(bv)
 
 i = 9_000
@@ -202,7 +202,7 @@ Random.seed!(1)
 len = 2^32 + 3
 bv = bitrand(len)
 bv1 = SucVector(bv)
-bv2 = IdxBitVector(bv)
+bv2 = RankedBitVector(bv)
 
 i = 2^32 + 1
 @btime GSAD.rank1($bv, $i);
@@ -214,7 +214,7 @@ len = 2^32 + 3
 bv = trues(len)
 bv0 = convert(IndexableBitVectors.CompactBitVector, bv)
 bv1 = SucVector(bv)
-bv2 = IdxBitVector(bv)
+bv2 = RankedBitVector(bv)
 
 IndexableBitVectors.rank1(bv0, len)
 IndexableBitVectors.rank1(bv1, len)

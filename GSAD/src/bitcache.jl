@@ -77,7 +77,7 @@ A bit vector with additional data for O(1) `rank()` and `select()`.
 
 See also: [`IndexedBitVector`](@ref)
 """
-mutable struct CachedBitVector <: AbstractIdxBitVector
+mutable struct CachedBitVector <: AbstractRankedBitVector
     bits::BitVector
     cache::Vector{BitCache64}
     

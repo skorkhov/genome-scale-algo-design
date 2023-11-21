@@ -20,9 +20,9 @@ include("TestUtils.jl")
     @test (UInt8(131), UInt32(1077)) == GSAD.split_bits_8plus32(i)
 end
 
-@testset "IdxBitVector() constructor" begin
+@testset "RankedBitVector() constructor" begin
     bitvector = BitVector([1, 0, 0])
-    v = IdxBitVector(bitvector)
+    v = RankedBitVector(bitvector)
     @test v.v === bitvector
     @test v.short == Int8[]
     @test v.long == Int32[]
@@ -30,7 +30,7 @@ end
     # define bitvector longen than 256 entries:
     len = 257
     bitvector = bitrand(len)
-    v = IdxBitVector(bitvector)
+    v = RankedBitVector(bitvector)
 
     @test v.v === bitvector
     
@@ -46,14 +46,14 @@ end
 #= test rank() and select() =#
 
 @testset "rank_within_uint64()" begin
-    v = TestUtils.make_bitvec_small(IdxBitVector)
+    v = TestUtils.make_bitvec_small(RankedBitVector)
     chunk = convert(BitVector, v).chunks[1]
     @test GSAD.rank_within_uint64(chunk, 2) == 2
     @test GSAD.rank_within_uint64(chunk, 3) == 3
     @test GSAD.rank_within_uint64(chunk, 4) == 3
 end
 
-@testset "rank1(::IdxBitVector, ...)" TestUtils.test_rank1(IdxBitVector)
-@testset "rank1(::IdxBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(IdxBitVector)
-@testset "select1(::IdxBitVector, ...)" TestUtils.test_select1(IdxBitVector)
+@testset "rank1(::RankedBitVector, ...)" TestUtils.test_rank1(RankedBitVector)
+@testset "rank1(::RankedBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(RankedBitVector)
+@testset "select1(::RankedBitVector, ...)" TestUtils.test_select1(RankedBitVector)
 

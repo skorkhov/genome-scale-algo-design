@@ -72,5 +72,5 @@ end
 
 @testset "rank1(::CachedBitVector, ...)" TestUtils.test_rank1(CachedBitVector)
 @testset "rank1(::CachedBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(CachedBitVector)
-# @testset "select1(::IdxBitVector, ...)" test_select1(IdxBitVector)
+# @testset "select1(::RankedBitVector, ...)" test_select1(RankedBitVector)
 
