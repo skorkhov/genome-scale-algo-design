@@ -1,5 +1,11 @@
 using Random
 using Test
+using GSAD
+
+include("TestUtils.jl")
+
+
+#= test constructor and type utils =#
 
 @testset "Split integer into 8+32 bits" begin
     @test_throws DomainError GSAD.split_bits_8plus32(-1)
@@ -36,4 +42,18 @@ end
     @test v.long == long
 end
 
+
+#= test rank() and select() =#
+
+@testset "rank_within_uint64()" begin
+    v = TestUtils.make_bitvec_small(IdxBitVector)
+    chunk = convert(BitVector, v).chunks[1]
+    @test GSAD.rank_within_uint64(chunk, 2) == 2
+    @test GSAD.rank_within_uint64(chunk, 3) == 3
+    @test GSAD.rank_within_uint64(chunk, 4) == 3
+end
+
+@testset "rank1(::IdxBitVector, ...)" TestUtils.test_rank1(IdxBitVector)
+@testset "rank1(::IdxBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(IdxBitVector)
+@testset "select1(::IdxBitVector, ...)" TestUtils.test_select1(IdxBitVector)
 

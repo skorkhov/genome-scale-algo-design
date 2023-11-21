@@ -172,23 +172,30 @@ using IndexableBitVectors, GSAD
 
 Random.seed!(1)
 bv = bitrand(1_000_000)
+bv0 = convert(IndexableBitVectors.CompactBitVector, bv)
 bv1 = SucVector(bv)
 bv2 = IdxBitVector(bv)
+bv3 = CachedBitVector(bv)
 
 i = 9_000
 @btime GSAD.rank1($bv, $i);
+@btime IndexableBitVectors.rank1($bv0, $i);
 @btime IndexableBitVectors.rank1($bv1, $i);
 @btime GSAD.rank1($bv2, $i);
+@btime GSAD.rank1($bv3, $i);
 
 i = 90_000
 @btime GSAD.rank1($bv, $i);
+@btime IndexableBitVectors.rank1($bv0, $i);
 @btime IndexableBitVectors.rank1($bv1, $i);
 @btime GSAD.rank1($bv2, $i);
+@btime GSAD.rank1($bv3, $i);
 
 i = 900_000
 @btime GSAD.rank1($bv, $i);
 @btime IndexableBitVectors.rank1($bv1, $i);
 @btime GSAD.rank1($bv2, $i);
+@btime GSAD.rank1($bv3, $i);
 
 # veery long vector:
 Random.seed!(1)
@@ -201,3 +208,14 @@ i = 2^32 + 1
 @btime GSAD.rank1($bv, $i);
 @btime IndexableBitVectors.rank1($bv1, $i);
 @btime GSAD.rank1($bv2, $i);
+
+# veery long vecctor of 1: 
+len = 2^32 + 3
+bv = trues(len)
+bv0 = convert(IndexableBitVectors.CompactBitVector, bv)
+bv1 = SucVector(bv)
+bv2 = IdxBitVector(bv)
+
+IndexableBitVectors.rank1(bv0, len)
+IndexableBitVectors.rank1(bv1, len)
+Int(GSAD.rank1(bv2, len))

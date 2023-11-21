@@ -1,4 +1,11 @@
 using Test
+using Random
+using GSAD
+
+include("TestUtils.jl")
+
+
+#= test constructor and type utils =#
 
 Base.copy(x::GSAD.BitCache64) = GSAD.BitCache64(x.cache)
 
@@ -37,7 +44,6 @@ Base.copy(x::GSAD.BitCache64) = GSAD.BitCache64(x.cache)
     @test cache.cache == val
 end
 
-
 @testset "CachedBitVector" begin
     bitvector = BitVector([1, 0, 0])
     v = CachedBitVector(bitvector)
@@ -47,7 +53,7 @@ end
     @test v.cache[1].cache == GSAD.BitCache64().cache
 
     # for longer vector that uses cache: 
-    v = make_bitvec_5chunk(CachedBitVector)
+    v = TestUtils.make_bitvec_5chunk(CachedBitVector)
     # first cache: 
     c1 = GSAD.BitCache64()
     GSAD.push_cache!(c1, 1, 4)
@@ -60,3 +66,11 @@ end
     @test v.cache[1].cache == c1.cache
     @test v.cache[2].cache == c2.cache
 end
+
+
+#= test rank() and select() =#
+
+@testset "rank1(::CachedBitVector, ...)" TestUtils.test_rank1(CachedBitVector)
+@testset "rank1(::CachedBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(CachedBitVector)
+# @testset "select1(::IdxBitVector, ...)" test_select1(IdxBitVector)
+
