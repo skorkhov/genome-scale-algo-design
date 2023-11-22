@@ -7,51 +7,24 @@ include("TestUtils.jl")
 
 #= test constructor and type utils =#
 
-@testset "Split integer into 8+32 bits" begin
-    @test_throws DomainError GSAD.split_bits_8plus32(-1)
-    @test_throws DomainError GSAD.split_bits_8plus32(1.5)
-    
-    # for actual numeric inputs: 
-    @test (UInt8(1), UInt32(0)) == (GSAD.split_bits_8plus32(1 << (31 + 1)))
-    @test (UInt8(2), UInt32(0)) == (GSAD.split_bits_8plus32(1 << (31 + 2)))
-    @test (UInt8(4), UInt32(0)) == (GSAD.split_bits_8plus32(1 << (31 + 3)))
-    
-    i = UInt(131) << 32 + UInt(1077)
-    @test (UInt8(131), UInt32(1077)) == GSAD.split_bits_8plus32(i)
-end
-
-@testset "RankedBitVector() constructor" begin
+@testset "RankedBitVector()" begin
     bitvector = BitVector([1, 0, 0])
     v = RankedBitVector(bitvector)
     @test v.bits === bitvector
-    @test v.short == Int8[]
-    @test v.long == Int32[]
+    @test v.chunks == Int8[0]
+    @test v.blocks == Int32[0]
 
-    # define bitvector longen than 256 entries:
-    len = 257
-    bitvector = bitrand(len)
-    v = RankedBitVector(bitvector)
-
-    @test v.bits === bitvector
-    
-    cp = cumsum(count_ones.(bitvector.chunks))
-    n_chunks = div(len, 64)
-    short = UInt8[i%4 != 0 ? cp[i] : 0 for i in 1:n_chunks]
-    long = UInt32[cp[i] for i in 1:n_chunks if i%4 == 0]
-    @test v.short == short
-    @test v.long == long
+    v = TestUtils.make_bitvec_5chunk(RankedBitVector)
+    @test length(v.chunks) == cld(length(v), GSAD.WIDTH_CHUNK)
+    @test length(v.blocks) == cld(length(v), GSAD.WIDTH_BLOCK)
+    chunks = UInt8[0, 4, 5, 5, 0]
+    blocks = UInt32[0, 5]
+    @test v.chunks == chunks
+    @test v.blocks == blocks
 end
 
 
 #= test rank() and select() =#
-
-@testset "rank_within_uint64()" begin
-    v = TestUtils.make_bitvec_small(RankedBitVector)
-    chunk = convert(BitVector, v).chunks[1]
-    @test GSAD.rank_within_uint64(chunk, 2) == 2
-    @test GSAD.rank_within_uint64(chunk, 3) == 3
-    @test GSAD.rank_within_uint64(chunk, 4) == 3
-end
 
 @testset "rank1(::RankedBitVector, ...)" TestUtils.test_rank1(RankedBitVector)
 @testset "rank1(::RankedBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(RankedBitVector)

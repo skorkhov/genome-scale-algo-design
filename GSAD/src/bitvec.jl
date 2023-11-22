@@ -1,54 +1,39 @@
 abstract type AbstractRankedBitVector <: AbstractVector{Bool} end
 
-function split_bits_8plus32(n)
-    try
-        n = UInt64(n)
-    catch 
-        throw(DomainError("only Unsigned ints can be split"))
-    end
-
-    n > 2^40 && throw(ArgumentError("Integer n should be below n^40: log2(n)=$(log2(n))"))
-    last32 = n % UInt32
-    first8 = (n >>> 32) % UInt8
-
-    first8, last32
-end
-
-function sum_short_block(v::BitVector, ith::Integer)
-    from = (ith - 1) * WIDTH_CHUNK + 1
-    to = ith * WIDTH_CHUNK
-    sum(v[from:to])
-end
-
 struct RankedBitVector <: AbstractRankedBitVector
     bits::BitVector
-    long::Vector{UInt32}
-    short::Vector{UInt8}
+    blocks::Vector{UInt32}
+    chunks::Vector{UInt8}
 
     function RankedBitVector(bits::BitVector) 
         n = length(bits)
+        n_chunks = cld(n, WIDTH_CHUNK)
+        n_blocks = cld(n, WIDTH_BLOCK)
         # init lookup tables
-        long = Vector{UInt32}(undef, div(n, WIDTH_BLOCK))
-        short = Vector{UInt8}(undef, div(n, WIDTH_CHUNK))
+        blocks = Vector{UInt32}(undef, n_blocks)
+        chunks = Vector{UInt8}(undef, n_chunks)
     
-        overall = 0 
-        relative = 0
-        for sth in eachindex(short)
-            if sth % CHUNKS_PER_BLOCK == 0 
-                # if at the end of a long block:
-                lth = div(sth, CHUNKS_PER_BLOCK) 
-                overall += sum_short_block(bits, sth)
-                short[sth], long[lth] = split_bits_8plus32(overall)
-                relative = 0
+        r_tot = 0 
+        r_rel = 0
+        for i_chunk in 1:n_chunks
+            chunk_offset_in_block = (i_chunk - 1) % CHUNKS_PER_BLOCK
+            bits_in_chunk = count_ones(bits.chunks[i_chunk])
+            
+            if chunk_offset_in_block == 0 
+                i_block = cld(i_chunk, CHUNKS_PER_BLOCK)
+                blocks[i_block] = r_tot & maskr(UInt64, 32)
+                chunks[i_chunk] = (r_tot >>> 32) % UInt8
+                r_rel = 0
             else 
-                inc = sum_short_block(bits, sth)
-                overall += inc
-                relative += inc
-                short[sth] = relative
+                chunks[i_chunk] = r_rel
             end
+
+            # increment rank counter:
+            r_tot += bits_in_chunk
+            r_rel += bits_in_chunk
         end
     
-        new(bits, long, short)
+        new(bits, blocks, chunks)
     end
 end
 
@@ -60,30 +45,41 @@ Base.show(io::IO, x::RankedBitVector) = Base.show(io, x.bits)
 # for some reason is necessary to make printing work in the terminal: 
 Base.show(io::IO, ::MIME"text/plain", v::RankedBitVector) = print(io, "RankedBitVector: ", v.bits)
 
-rank_within_uint64(i::UInt64, pos) = count_ones(i << (64 - pos))
+"""
+    rank1(v::RankedBitVector, i::Integer)
 
-function rank1(v::RankedBitVector, i)
-    i = clamp(i, 0, length(v))
-    ilong = div(i, WIDTH_BLOCK)
-    ishort = div(i, WIDTH_CHUNK)
+Compute the number of 1s in `v[1:i]` in O(1) time.
+"""
+function rank1(v::RankedBitVector, i::Integer)
+    if i < 0 || length(v) < i
+        throw(BoundsError("index `i` has to be in [0, length(v)]; given i=$i"))
+    end
+    
+    return rank1_unsafe(v, i)
+end
 
-    # each cached rank of a long chunk is stored in two arrays: 
-    # first 8 bits in the aligned short chunk table
-    # last 32 bits in the long chunk table
-    ishort_first8 = ilong * CHUNKS_PER_BLOCK
-    rank_cache_long_first8 = ishort_first8 > 0 ? v.short[ishort_first8] : UInt8(0)
-    rank_cache_long_last32 = ilong > 0 ? v.long[ilong] : 0
-    rank_cache_long = UInt64(rank_cache_long_first8) << 32 + rank_cache_long_last32
-    
-    # every CHUNKS_PER_BLOCK'th short chunk stores long cache - ignore
-    rank_cache_short = ishort % CHUNKS_PER_BLOCK == 0 ? 0 : v.short[ishort]
-    rank_in_chunk = rank_within_uint64(v.bits.chunks[ishort + 1], i % 64)
-    
-    rank_cache_long + rank_cache_short + rank_in_chunk
+function rank1_unsafe(v::RankedBitVector, i::Integer)
+    i_block = cld(i, WIDTH_BLOCK)
+    i_chunk = cld(i, WIDTH_CHUNK)
+    chunk = v.bits.chunks[i_chunk]
+
+    chunk_offset_in_block = (i_chunk - 1) % CHUNKS_PER_BLOCK
+    r = (
+        convert(Int, v.chunks[i_chunk - chunk_offset_in_block]) << 32 +
+        v.blocks[i_block] + 
+        count_ones(chunk & maskr(typeof(chunk), i % WIDTH_CHUNK))
+    )
+    chunk_offset_in_block == 0 || r += v.chunks[i_chunk]
+
+    return r
 end
 
 
-# "slow" select with binary search using rank1: log(n) time
+"""
+    select1(v::RankedBitVector, j)
+
+Compute index of a 1-element of `v` with rank `j` in O(log(len(v))) time. 
+"""
 function select1(v::RankedBitVector, j)
     hi = length(v)
     lo = 1
