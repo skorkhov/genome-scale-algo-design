@@ -2,9 +2,9 @@ module GSAD
 
 #= =#
 
-const BLOCK_WIDTH_SHORT = 64
-const BLOCK_WIDTH_LONG = 256
-const N_SHORT_PER_LONG = 4
+const WIDTH_BLOCK = 256
+const WIDTH_CHUNK = 64
+const CHUNKS_PER_BLOCK = 4
 
 include("intro.jl")
 include("reference.jl")

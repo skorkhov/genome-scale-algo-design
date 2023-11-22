@@ -83,18 +83,18 @@ mutable struct CachedBitVector <: AbstractRankedBitVector
     
     function CachedBitVector(bits::BitVector)
         n = length(bits)
-        n_short = fld(n, BLOCK_WIDTH_SHORT)       # short block caches stored
-        # n_cache = cld(n_short, N_SHORT_PER_LONG)
-        n_cache = fld(n_short, N_SHORT_PER_LONG) + 1
+        n_short = fld(n, WIDTH_CHUNK)       # short block caches stored
+        # n_cache = cld(n_short, CHUNKS_PER_BLOCK)
+        n_cache = fld(n_short, CHUNKS_PER_BLOCK) + 1
         cache = [BitCache64() for _ in 1:n_cache]
     
         overall = 0
         relative = 0
         for current_short in 1:n_short
-            current_long = fld(current_short, N_SHORT_PER_LONG) + 1
+            current_long = fld(current_short, CHUNKS_PER_BLOCK) + 1
             # use relative index of short block in long
             # to decide where to store the rank in the cache obj:
-            i = current_short % N_SHORT_PER_LONG
+            i = current_short % CHUNKS_PER_BLOCK
             
             relative += count_ones(bits.chunks[current_short])
             if i == 0
@@ -120,10 +120,10 @@ Base.show(io::IO, x::CachedBitVector) = Base.print(x.bits)
 Base.show(io::IO, ::MIME"text/plain", z::CachedBitVector) = print(io, "CachedBitVector: ", z.bits)
 
 function rank1(v::CachedBitVector, i::Integer)
-    stored_short, pos = divrem(i, BLOCK_WIDTH_SHORT)
-    stored_long = fld(stored_short, N_SHORT_PER_LONG) + 1
+    stored_short, pos = divrem(i, WIDTH_CHUNK)
+    stored_long = fld(stored_short, CHUNKS_PER_BLOCK) + 1
 
-    idx_in_cache = stored_short % N_SHORT_PER_LONG
+    idx_in_cache = stored_short % CHUNKS_PER_BLOCK
     rank_in_chunk = count_ones(v.bits.chunks[stored_short + 1] << (64 - pos))
     get_cache(v.cache[stored_long], idx_in_cache) + rank_in_chunk
 end

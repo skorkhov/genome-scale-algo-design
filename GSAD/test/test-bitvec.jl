@@ -23,7 +23,7 @@ end
 @testset "RankedBitVector() constructor" begin
     bitvector = BitVector([1, 0, 0])
     v = RankedBitVector(bitvector)
-    @test v.v === bitvector
+    @test v.bits === bitvector
     @test v.short == Int8[]
     @test v.long == Int32[]
 
@@ -32,7 +32,7 @@ end
     bitvector = bitrand(len)
     v = RankedBitVector(bitvector)
 
-    @test v.v === bitvector
+    @test v.bits === bitvector
     
     cp = cumsum(count_ones.(bitvector.chunks))
     n_chunks = div(len, 64)
