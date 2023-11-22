@@ -69,7 +69,9 @@ function rank1_unsafe(v::RankedBitVector, i::Integer)
         v.blocks[i_block] + 
         count_ones(chunk & maskr(typeof(chunk), i % WIDTH_CHUNK))
     )
-    chunk_offset_in_block == 0 || r += v.chunks[i_chunk]
+    if chunk_offset_in_block != 0 
+        r += v.chunks[i_chunk]
+    end
 
     return r
 end
