@@ -88,7 +88,7 @@ function test_select1(::Type{T}) where T
     @test select1(v, 1) == 1
     @test select1(v, 2) == 2
     @test select1(v, 3) == 3
-    @test_throws BoundsError select1(v, 10)
+    @test_throws DomainError select1(v, 10)
 
     v = make_bitvec_5chunk(T)
     @test select1(v, 4) == 5

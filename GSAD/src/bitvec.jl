@@ -52,7 +52,7 @@ Compute the number of 1s in `v[1:i]` in O(1) time.
 """
 function rank1(v::RankedBitVector, i::Integer)
     if i < 0 || length(v) < i
-        throw(BoundsError("index `i` has to be in [0, length(v)]; given i=$i"))
+        throw(BoundsError(v, i))
     end
     
     return rank1_unsafe(v, i)
@@ -64,13 +64,13 @@ function rank1_unsafe(v::RankedBitVector, i::Integer)
     chunk = v.bits.chunks[i_chunk]
 
     chunk_offset_in_block = (i_chunk - 1) % CHUNKS_PER_BLOCK
-    r = (
+    @inbounds r = (
         convert(Int, v.chunks[i_chunk - chunk_offset_in_block]) << 32 +
         v.blocks[i_block] + 
         count_ones(chunk & maskr(typeof(chunk), i % WIDTH_CHUNK))
     )
     if chunk_offset_in_block != 0 
-        r += v.chunks[i_chunk]
+        @inbounds r += v.chunks[i_chunk]
     end
 
     return r
@@ -87,7 +87,7 @@ function select1(v::RankedBitVector, j)
     lo = 1
     r_max = rank1(v, hi)
     if j <= 0 || j > r_max
-        throw(BoundsError("rank(v, length(v))=$r_max; attempting to access $j"))
+        throw(DomainError(j, "cannot select(v, $j) if max-rank(v) < $j"))
     end
 
     mid = div(hi + lo, 2)
