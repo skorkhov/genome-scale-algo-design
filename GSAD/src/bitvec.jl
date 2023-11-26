@@ -281,47 +281,43 @@ function select1(v::AbstractMappedBitVector, j::Integer)
     return select1_unsafe(v, j)
 end
 
-function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
-    which_seg = cld(j, 4096)                            # segment index
-    istart_seg = v.layout.segpos[which_seg]             # segment start pos
-    which_seg_dense = rank(layout.is_dense, which_seg)  # rank among dense segments
-    j_inseg = (j - 1) % 4096 + 1                        # j relative to segment start
-    
-    is_dense = v.layout.is_dense[which_seg]
+@inline iloc(i::Integer, size::Integer) = (i - 1) % size + 1
 
-    # if sparse chunk, return sparse:
+function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
+    seg_idx = cld(j, 4096)                      # segment index
+    seg_start_i = v.layout.segpos[seg_idx]      # segment start pos
+    segD_rank = rank(layout.is_dense, seg_idx)  # rank among dense segments
+    jj = iloc(i, 4096)                          # j relative to segment start
+    
+    is_dense = v.layout.is_dense[seg_idx]
+    # if sparse chunk, query directly from sparse lookup table
     if !is_dense
-        return istart_seg + v.Ss[j - which_seg_D, j_inseg]
+        return seg_start_i + v.Ss[seg_idx - segD_rank, jj]
     end
 
-    which_subseg_in_seg = cld(j_inseg, 8)
-    istart_subseg = istart_seg + v.layout.subsegpos[which_seg_dense, which_subseg_in_seg]
+    subseg_idx_rel = cld(jj, 8)
+    subseg_start_i = seg_start_i + v.layout.subsegpos[segD_rank, subseg_idx_rel]
 
     # get subsegment type:
-    which_subseg_overall = v.layout.cumsubsegpos[which_seg_dense] + which_subseg_in_seg
-    is_ddense = v.layout.is_ddense[which_subseg_overall]
-    # coordinates: 
-    which_subseg_dense = rank1(v.layout.is_ddense, which_subseg_overall)
-    # 1 -> 1
-    # ...
-    # 7 -> 7 
-    # 8 -> 8
-    # 9 -> 1
-    j_insubseg = (j_inseg - 1) % 8 + 1
+    subseg_idx = v.layout.cumsubsegpos[segD_rank] + subseg_idx_rel
+    is_ddense = v.layout.is_ddense[subseg_idx]
+    jj = iloc(jj, 8)
 
     if is_ddense
-        # Dd query
-        # TODO: implement Dd cache by querrying the bitvector with findnext
-        _pos = istart_subseg
-        for _ in 1:j_insubseg  # not constant time but bounded by 8
+        # for Dd, look for jj'th 1-bit starting from beginning of subseg;
+        # not constant time,
+        # but bounded by population(subseg_Dd)
+        pos = _pos = subseg_start_i
+        for _ in 1:jj  # not constant time but bounded by 8
             pos = findnext(v.bits, _pos)
             _pos += 1
         end
     else 
-        # Ds query
-        which_subseg_sparse = which_subseg_overall - which_subseg_dense
-        pos = v.Ds[which_subseg_sparse, j_insubseg]
+        # query dirctly in Ds
+        subsegDd_rank = rank1(v.layout.is_ddense, subseg_idx)
+        which_subseg_sparse = subseg_idx - subsegDd_rank
+        pos = v.Ds[which_subseg_sparse, jj]
     end
 
-    return istart_subseg + pos
+    return subseg_start_i + pos
 end
