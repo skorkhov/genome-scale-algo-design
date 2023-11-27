@@ -165,7 +165,7 @@ struct MappedBitVectorLayout
     # equals rank(is_dense, seg_idx) * subsegments per segment
     # len(.) = [number of D segs] = same as nrow(subsegpos)
     # .[i] = sum(flatten(subsegpos[1:i]))
-    cumsubsegpos::Vector{UInt32}
+    # cumsubsegpos::Vector{UInt32}
 
     # is a given sub-segment dense (Ds)? 
     # rank of the sub-segment among sub-segments of the same kind? - 
@@ -175,16 +175,18 @@ end
 
 function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     n = length(bits)
+    # TODO: don't use rank on bits - don't need it
     maxrank = rank1(bits, n)  # max number of set bits
     maxnseg::Int = maxrank / 64^2
-    maxnsubseg::Int = 512 # div(64 ^ 2, 8) = log(2^64) ^ 2 / sqrt(log(2^64))
+    maxnsubseg::Int = 512  # div(64 ^ 2, 8) = log(2^64) ^ 2 / sqrt(log(2^64))
     
-    threshold_seg = 64 ^ 4     # log(n)^4
-    threshold_subseg = 64 / 2  # log(n) / 2
-    pop_seg = 64 ^ 2           # log(n)^2
-    pop_subseg = 8             # sqrt(log(2^64))
+    # size and ratio constants:
+    threshold_seg = 64 ^ 4          # log(n)^4
+    threshold_subseg::Int = 64 / 2  # log(n) / 2
+    pop_seg = 64 ^ 2                # log(n)^2
+    pop_subseg = 8                  # sqrt(log(2^64))
 
-    # TODO: keep track of counts variable per inpits (number of segs, subsegs)
+    # counters:
     nseg = 0
     nsubseg = 0
 
@@ -192,7 +194,6 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     segpos = Vector{UInt64}(undef, maxnseg)
     is_dense = falses(maxnseg)
     subsegpos = Matrix{UInt32}(undef, (maxnseg, maxnsubseg))
-    cumsubsegpos = Vector{UInt32}(undef, maxnseg)
     is_ddense = falses(maxnsubseg)
 
     # first pass to delineate segments: 
@@ -206,11 +207,11 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
             nseg += 1
             seg_start_i = i
             segpos[nseg] = i
-
         end
 
-        # TODO: how to handle the last segment, which will be incomplete?
-        # if j is the end of D segment: 
+        # If j is the end of D segment, set is_dense;
+        # if a segment starts but the end is never reached, 
+        # the segment remains indicated as Sparse (by is_dense initialization).
         if j % pop_seg == 0 && i - seg_start_i + 1 < threshold_seg
             is_dense[nseg] = true
         end
@@ -221,9 +222,8 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     # second pass to delineate subsegments:
     # iterate over all Dense segments
     # need to iterate through the number of D segs
-    nsegD = rank1(is_dense, nseg)  # TODO: should be replaced with a counter
+    nsegD = rank1(is_dense, nseg)  # TODO: should be replaced with a counter in previous pass
     segD_idx = 0
-    _cumsubsegpos = 0
     for segD_rank in 1:nsegD
         segD_idx = findnext(is_dense, segD_idx + 1)
         segD_start_i = segpos[segD_idx]
@@ -239,27 +239,21 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
                 subsegpos[segD_rank, nsubseg] = i                
             end
 
-            # TODO: how to handle last segment, which may be incomplete?
-            # if j is the end of Dd subsegment: 
+            # If j is the end of Dd subsegment, set is_ddense; 
+            # if an end of a subseg is never reached, 
+            # the subseg will remain Ds (by is_ddense indialization).
             if j % pop_subseg == 0 && 1 - subseg_start_i + 1 < threshold_subseg
                 is_ddense[segD_rank] = true
             end
         end
-        
-        # store cumulative number of subsegments at the start of each D segment
-        cumsubsegpos[segD_rank] = _cumsubsegpos
-        _cumsubsegpos = nsubseg
     end
 
-    # TODO: trim each array to just the size used
     segpos = segpos[1:nseg]
-    is_dense = is_dense[1:nseg]
+    is_dense = RankedBitVector(is_dense[1:nseg])
     subsegpos = subsegpos[1:nsegD, 1:subsegpos]
-    cumsubsegpos = cumsubsegpos[1:nsegD]
-    is_ddense = is_ddense[1:nsegD]
+    is_ddense = RankedBitVector(is_ddense[1:nsegD])
 
-    # TODO: convert is_dense and is_ddense to ranked bit vectors
-    new(segpos, is_dense, subsegpos, cumsubsegpos, is_ddense)
+    new(segpos, is_dense, subsegpos, is_ddense)
 end
 
 
@@ -401,13 +395,13 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
     jj = iloc(jj, 8)  # j relative to subsegment start
     
     # get subsegment type:
-    subseg_idx = v.layout.cumsubsegpos[segD_rank] + subseg_idx_rel
+    subseg_idx::Int = segD_rank * div(4096, 8) + subseg_idx_rel
     is_ddense = v.layout.is_ddense[subseg_idx]
 
     if is_ddense
         # for Dd, look for jj'th 1-bit starting from beginning of subseg;
         # not constant time,
-        # but bounded by population(subseg_Dd)
+        # but bounded by pop(subseg_Dd)
         pos = subseg_start_i - 1
         for _ in 1:jj  # not constant time but bounded by 8
             pos = findnext(v.bits, pos + 1)
