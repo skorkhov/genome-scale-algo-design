@@ -120,6 +120,22 @@ end
 "Supertype for one-dimensional arrays with fast select()."
 abstract type AbstractMappedBitVector <: AbstractVector{Bool} end
 
+
+"Type to describe patially known container size/element."
+struct ContainerLayout{N, T}
+    dims::NTuple{N, Int}
+    isknown::Vector{Bool}
+
+    # TODO: implement initializer - could be needed for dynamically sized DS
+    # TODO: fix operations on ContainerLayout
+end
+
+@inline bitwidth(x::ContainerLayout{N, T}) where {N, T} = sizeof(T) * 8
+@inline size(x::ContainerLayout) = x.dims
+
+init(x::ContainerLayout{N, T}) where {N, T} = Assay{T, N}(undef, size(x))
+
+
 """
     MappedBitVectorLayout
 
@@ -146,21 +162,108 @@ struct MappedBitVectorLayout
     # subsegpos::Vector{Vector{UInt32}}
 
     # total number of subsegments at the start of each dense segment
+    # equals rank(is_dense, seg_idx) * subsegments per segment
+    # len(.) = [number of D segs] = same as nrow(subsegpos)
     # .[i] = sum(flatten(subsegpos[1:i]))
-    cumsubsegpos::Vector{UInt32}  # same length as subsegpos
+    cumsubsegpos::Vector{UInt32}
 
     # is a given sub-segment dense (Ds)? 
     # rank of the sub-segment among sub-segments of the same kind? - 
     # use as a query index for Ds
     is_ddense::RankedBitVector
+end
 
-    function MappedBitVectorLayout(bits::BitVector)
-        # TODO: implement layout constructor
+function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
+    n = length(bits)
+    maxrank = rank1(bits, n)  # max number of set bits
+    maxnseg::Int = maxrank / 64^2
+    maxnsubseg::Int = 512 # div(64 ^ 2, 8) = log(2^64) ^ 2 / sqrt(log(2^64))
+    
+    threshold_seg = 64 ^ 4     # log(n)^4
+    threshold_subseg = 64 / 2  # log(n) / 2
+    pop_seg = 64 ^ 2           # log(n)^2
+    pop_subseg = 8             # sqrt(log(2^64))
+
+    # TODO: keep track of counts variable per inpits (number of segs, subsegs)
+    nseg = 0
+    nsubseg = 0
+
+    # initialize empty containers: 
+    segpos = Vector{UInt64}(undef, maxnseg)
+    is_dense = falses(maxnseg)
+    subsegpos = Matrix{UInt32}(undef, (maxnseg, maxnsubseg))
+    cumsubsegpos = Vector{UInt32}(undef, maxnseg)
+    is_ddense = falses(maxnsubseg)
+
+    # first pass to delineate segments: 
+    i = 0
+    for j in 1:maxrank
+        # advance to next 1-bit
+        i = findnext(bits, i + 1)  # position of j'th 1-bit
+
+        # if j is a segment start:
+        if j % pop_seg == 1
+            nseg += 1
+            seg_start_i = i
+            segpos[nseg] = i
+
+        end
+
+        # TODO: how to handle the last segment, which will be incomplete?
+        # if j is the end of D segment: 
+        if j % pop_seg == 0 && i - seg_start_i + 1 < threshold_seg
+            is_dense[nseg] = true
+        end
+
+        # Idea: advance in increments of 64 if >= 64 bits remain to fill the seg
     end
+
+    # second pass to delineate subsegments:
+    # iterate over all Dense segments
+    # need to iterate through the number of D segs
+    nsegD = rank1(is_dense, nseg)  # TODO: should be replaced with a counter
+    segD_idx = 0
+    _cumsubsegpos = 0
+    for segD_rank in 1:nsegD
+        segD_idx = findnext(is_dense, segD_idx + 1)
+        segD_start_i = segpos[segD_idx]
+
+        i = segD_start_i - 1
+        for j in 1:pop_subseg
+            i = findnext(bits, i + 1)  # position of j'th bit in subseg
+
+            # if j is a subsegment start: 
+            if j % pop_subseg == 1
+                nsubseg += 1
+                subseg_start_i = i
+                subsegpos[segD_rank, nsubseg] = i                
+            end
+
+            # TODO: how to handle last segment, which may be incomplete?
+            # if j is the end of Dd subsegment: 
+            if j % pop_subseg == 0 && 1 - subseg_start_i + 1 < threshold_subseg
+                is_ddense[segD_rank] = true
+            end
+        end
+        
+        # store cumulative number of subsegments at the start of each D segment
+        cumsubsegpos[segD_rank] = _cumsubsegpos
+        _cumsubsegpos = nsubseg
+    end
+
+    # TODO: trim each array to just the size used
+    segpos = segpos[1:nseg]
+    is_dense = is_dense[1:nseg]
+    subsegpos = subsegpos[1:nsegD, 1:subsegpos]
+    cumsubsegpos = cumsubsegpos[1:nsegD]
+    is_ddense = is_ddense[1:nsegD]
+
+    # TODO: convert is_dense and is_ddense to ranked bit vectors
+    new(segpos, is_dense, subsegpos, cumsubsegpos, is_ddense)
 end
 
 
-# struct DdCache{T} where T <: Unsigned end
+
 """
     DdCache{T}
 
@@ -221,7 +324,6 @@ end
 
 Base.getindex(A::DdCache, bits::Integer, j::Integer) = getindex(A, convert(Unsigned, bits), j)
 
-
 """
     MappedBitVector
     
@@ -235,8 +337,7 @@ struct MappedBitVector <: AbstractMappedBitVector
 
     # Sparse: stores position of each 1 bit
     # size(elem) = log(n)
-    # [log(n) ^ 2] x [count(S)] for 2^32 input
-    # [count(S)] x [2 ^ 10]
+    # [count(S)] x [32^2 = 2 ^ 10] for 2^32-length input
     Ss::Matrix{UInt32}
 
     # Dense-sparse: stores pos of each 1-bit (relative to start of D)
@@ -261,7 +362,7 @@ struct MappedBitVector <: AbstractMappedBitVector
 
     # define this as a singleton type
     # TODO: fix type of Dd cache... do we even need it?
-    Dd::DdCache{UInt64}
+    # Dd::DdCache{UInt64}
 
     function MappedBitVector(bits::BitVector)
         # TODO: implement MappedBitVector constructor
@@ -297,20 +398,19 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
 
     subseg_idx_rel = cld(jj, 8)
     subseg_start_i = seg_start_i + v.layout.subsegpos[segD_rank, subseg_idx_rel]
-
+    jj = iloc(jj, 8)  # j relative to subsegment start
+    
     # get subsegment type:
     subseg_idx = v.layout.cumsubsegpos[segD_rank] + subseg_idx_rel
     is_ddense = v.layout.is_ddense[subseg_idx]
-    jj = iloc(jj, 8)
 
     if is_ddense
         # for Dd, look for jj'th 1-bit starting from beginning of subseg;
         # not constant time,
         # but bounded by population(subseg_Dd)
-        pos = _pos = subseg_start_i
+        pos = subseg_start_i - 1
         for _ in 1:jj  # not constant time but bounded by 8
-            pos = findnext(v.bits, _pos)
-            _pos += 1
+            pos = findnext(v.bits, pos + 1)
         end
     else 
         # query dirctly in Ds
