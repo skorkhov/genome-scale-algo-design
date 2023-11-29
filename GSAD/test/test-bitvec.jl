@@ -5,7 +5,7 @@ using GSAD
 include("TestUtils.jl")
 
 
-#= test constructor and type utils =#
+#= RakedBitVector =#
 
 @testset "RankedBitVector()" begin
     bitvector = BitVector([1, 0, 0])
@@ -23,10 +23,28 @@ include("TestUtils.jl")
     @test v.blocks == blocks
 end
 
-
-#= test rank() and select() =#
-
 @testset "rank1(::RankedBitVector, ...)" TestUtils.test_rank1(RankedBitVector)
 @testset "rank1(::RankedBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(RankedBitVector)
 @testset "select1(::RankedBitVector, ...)" TestUtils.test_select1(RankedBitVector)
+
+
+#= MappedBitVector =#
+
+@testset "MappedBitVectorLayout()" begin
+    # basic generator on a short vector: 
+    bv = TestUtils.make_bitvec_small(BitVector)
+    layout = MappedBitVectorLayout(bv)
+    @test layout.segpos == UInt64[1]
+    @test layout.is_dense == RankedBitVector(BitVector([0]))
+    @test layout.subsegpos == Matrix{UInt32}(undef, (0, 0))
+    @test layout.is_ddense == RankedBitVector(BitVector())
+
+    bv = trues(4096 + 1)
+    layout = MappedBitVectorLayout(bv)
+    @test layout.is_dense == RankedBitVector(BitVector([1, 0]))
+    @test layout.segpos == UInt64[1, 4097]
+    @test layout.is_ddense == RankedBitVector(trues(512))
+    @test layout.subsegpos == reshape(UInt32[1:8:4096...], (1, 512))
+end
+
 

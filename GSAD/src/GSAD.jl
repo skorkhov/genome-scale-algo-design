@@ -18,6 +18,8 @@ export
     RankedBitVector, 
     BitCache64,
     CachedBitVector,
+    MappedBitVector,
+    MappedBitVectorLayout,
     # methods:
     rank1,
     select1
