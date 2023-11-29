@@ -159,12 +159,10 @@ struct MappedBitVectorLayout
     # 
     # [number of D segs] x [512]
     subsegpos::Matrix{UInt32}
-    # subsegpos::Vector{Vector{UInt32}}
 
     # total number of subsegments at the start of each dense segment
     # equals rank(is_dense, seg_idx) * subsegments per segment
     # len(.) = [number of D segs] = same as nrow(subsegpos)
-    # .[i] = sum(flatten(subsegpos[1:i]))
     # cumsubsegpos::Vector{UInt32}
 
     # is a given sub-segment dense (Ds)? 
@@ -253,7 +251,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     subsegpos = subsegpos[1:nsegD, 1:subsegpos]
     is_ddense = RankedBitVector(is_ddense[1:nsegD])
 
-    new(segpos, is_dense, subsegpos, is_ddense)
+    MappedBitVectorLayout(segpos, is_dense, subsegpos, is_ddense)
 end
 
 
@@ -372,17 +370,16 @@ Compute position of 1-bit with rank k in O(1) time.
 function select1(v::AbstractMappedBitVector, j::Integer)
     # check: j < rank(v, length(v))
     # cannot be checked in constant time without using a ranked bit vector
-    
     return select1_unsafe(v, j)
 end
 
 @inline iloc(i::Integer, size::Integer) = (i - 1) % size + 1
 
 function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
-    seg_idx = cld(j, 4096)                      # segment index
-    seg_start_i = v.layout.segpos[seg_idx]      # segment start pos
-    segD_rank = rank(layout.is_dense, seg_idx)  # rank among dense segments
-    jj = iloc(i, 4096)                          # j relative to segment start
+    seg_idx = cld(j, 4096)                         # segment index
+    seg_start_i = v.layout.segpos[seg_idx]         # segment start pos
+    segD_rank = rank1(v.layout.is_dense, seg_idx)  # rank among dense segments
+    jj = iloc(i, 4096)                             # j relative to segment start
     
     is_dense = v.layout.is_dense[seg_idx]
     # if sparse chunk, query directly from sparse lookup table
@@ -415,3 +412,22 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
 
     return subseg_start_i + pos
 end
+
+"Type to store a bit ID location extracted from MappedBitVectorLayout"
+function locate_in_segment(layout::MappedBitVectorLayout, j::Integer)
+    # is jth 1-bit in a dense segment? 
+    seg_idx = cld(j, 4096)                        # segment index
+    is_dense = layout.is_dense[seg_idx]
+    
+    # return index among the respective type of segments: 
+    segD_rank = rank1(layout.is_dense, seg_idx)   # rank among dense segments
+    index = is_dense ? segD_rank : seg_idx - segD_rank
+    
+
+    i_start = layout.segpos[seg_idx]  # segment start pos
+    jj = iloc(i, 4096)                # j relative to segment start
+    
+    # return: tuple (is_dense::Bool, start_i::Int, index::Int, jj::Int)
+    return is_dense, i_start, index, jj
+end
+
