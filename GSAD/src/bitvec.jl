@@ -136,7 +136,6 @@ end
 
 init(x::ContainerLayout{N, T}) where {N, T} = Assay{T, N}(undef, size(x))
 
-
 """
     MappedBitVectorLayout
 
@@ -171,6 +170,9 @@ struct MappedBitVectorLayout
     # use as a query index for Ds
     is_ddense::RankedBitVector
 end
+
+"Return new index of `i`th element in a vector split into `size`-long chunks."
+@inline iloc(i::Integer, size::Integer) = (i - 1) % size + 1
 
 function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     n = length(bits)
@@ -363,8 +365,12 @@ struct MappedBitVector <: AbstractMappedBitVector
     # TODO: fix type of Dd cache... do we even need it?
     # Dd::DdCache{UInt64}
 
-    function MappedBitVector(bits::BitVector)
-        # TODO: implement MappedBitVector constructor
+    function MappedBitVector(bits::T) where T <: AbstractVector{Bool}
+        layout = MappedBitVectorLayout(bits)
+        Ss = Matrix{UInt32}(undef, ())
+        Ds = Matrix{UInt32}(undef, ())
+
+        new(bits, layout, Ss, Ds)
     end
 end
 
@@ -379,8 +385,6 @@ function select1(v::AbstractMappedBitVector, j::Integer)
     # cannot be checked in constant time without using a ranked bit vector
     return select1_unsafe(v, j)
 end
-
-@inline iloc(i::Integer, size::Integer) = (i - 1) % size + 1
 
 function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
     seg_idx = cld(j, 4096)                         # segment index
@@ -421,20 +425,23 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
 end
 
 "Type to store a bit ID location extracted from MappedBitVectorLayout"
-function locate_in_segment(layout::MappedBitVectorLayout, j::Integer)
-    # is jth 1-bit in a dense segment? 
-    seg_idx = cld(j, 4096)                        # segment index
+function locate_in_segment(layout::MappedBitVectorLayout, j::Integer)::Tuple{Bool, Bool, Int, Int, Int}
+    # is jth 1-bit in a Dense segment? 
+    seg_idx = cld(j, 4096)
     is_dense = layout.is_dense[seg_idx]
     
-    # return index among the respective type of segments: 
-    segD_rank = rank1(layout.is_dense, seg_idx)   # rank among dense segments
-    index = is_dense ? segD_rank : seg_idx - segD_rank
+    # rank among segments of the same type: 
+    segD_rank = rank1(layout.is_dense, seg_idx)
+    seg_rank = is_dense ? segD_rank : seg_idx - segD_rank
     
-
     i_start = layout.segpos[seg_idx]  # segment start pos
-    jj = iloc(i, 4096)                # j relative to segment start
+    jj = iloc(j, 4096)                # j relative to segment start
     
-    # return: tuple (is_dense::Bool, start_i::Int, index::Int, jj::Int)
-    return is_dense, i_start, index, jj
-end
+    # is jth 1-bit in a Dd segment?
+    subseg_idx = (segD_rank - 1) * div(4096, 8) + cld(jj, 8)
+    is_ddense = layout.is_ddense[subseg_idx]
 
+    # TODO: use the result in select1() to infer offsets and query the cache
+    # return: tuple (is_dense::Bool, is_ddense::Bool, start_i::Int, seg_rank::Int, jj::Int)
+    return is_dense, is_ddense, i_start, seg_rank, jj
+end

@@ -44,7 +44,17 @@ end
     @test layout.is_dense == RankedBitVector(BitVector([1, 0]))
     @test layout.segpos == UInt64[1, 4097]
     @test layout.is_ddense == RankedBitVector(trues(512))
+    # TODO: transpose subsegpos
     @test layout.subsegpos == reshape(UInt32[1:8:4096...], (1, 512))
+    # @test layout.subsegpos == reshape(UInt32[1:8:4096...], (512, 1))
+end
+
+
+@testset "locate_in_segment(::MappedBitVectorLayout, j)" begin
+    bv = trues(4096)
+    layout = MappedBitVectorLayout(bv)
+    res = GSAD.locate_in_segment(layout, 1)
+    @test res == (true, true, 1, 1, 1)
 end
 
 
