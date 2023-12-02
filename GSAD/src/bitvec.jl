@@ -437,9 +437,19 @@ function locate_in_segment(layout::MappedBitVectorLayout, j::Integer)::Tuple{Boo
     i_start = layout.segpos[seg_idx]  # segment start pos
     jj = iloc(j, 4096)                # j relative to segment start
     
+    # if segment is Sparse
+    if ~ is_dense
+        return is_dense, false, i_start, seg_rank, jj
+    end
+    
     # is jth 1-bit in a Dd segment?
+    
     subseg_idx = (segD_rank - 1) * div(4096, 8) + cld(jj, 8)
+    i_start = layout.subsegpos[subseg_idx]
     is_ddense = layout.is_ddense[subseg_idx]
+    subsegDd_rank = rank1(layout.is_ddense, subseg_idx)
+    seg_rank = is_ddense ? subsegDd_rank : subseg_idx - subsegDd_rank
+    jj = iloc(jj, 8)
 
     # TODO: use the result in select1() to infer offsets and query the cache
     # return: tuple (is_dense::Bool, is_ddense::Bool, start_i::Int, seg_rank::Int, jj::Int)

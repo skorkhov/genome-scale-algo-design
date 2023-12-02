@@ -51,10 +51,35 @@ end
 
 
 @testset "locate_in_segment(::MappedBitVectorLayout, j)" begin
+    # sparse segment: 
+    bv = falses(4096); bv[2000] = 1
+    layout = MappedBitVectorLayout(bv)
+    res = GSAD.locate_in_segment(layout, 1)
+    @test res == (true, true, 2000, 1, 1)
+    
     bv = trues(4096)
     layout = MappedBitVectorLayout(bv)
     res = GSAD.locate_in_segment(layout, 1)
     @test res == (true, true, 1, 1, 1)
+
+    bv = trues(4096)
+    layout = MappedBitVectorLayout(bv)
+    res = GSAD.locate_in_segment(layout, 9)
+    @test res == (true, true, 9, 2, 1)
+    res = GSAD.locate_in_segment(layout, 11)
+    @test res == (true, true, 9, 2, 3)
+
+    bv = trues(4096 * 2)
+    layout = MappedBitVectorLayout(bv)
+    res = GSAD.locate_in_segment(layout, 4096 + 1)
+    @test res == (true, true, 4097, 2, 1)
+    res = GSAD.locate_in_segment(layout, 4096 + 5)
+    @test res == (true, true, 4097, 2, 5)
+
+    bv = [trues(4096); falses(4089); trues(1); falses(6)]
+    layout = MappedBitVectorLayout(bv)
+    res = GSAD.locate_in_segment(layout, 4097)
+    @test res == (false, false, 4096 + 4090, 1, 1)
 end
 
 
