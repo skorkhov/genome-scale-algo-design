@@ -44,9 +44,16 @@ end
     @test layout.is_dense == RankedBitVector(BitVector([1, 0]))
     @test layout.segpos == UInt64[1, 4097]
     @test layout.is_ddense == RankedBitVector(trues(512))
-    # TODO: transpose subsegpos
-    @test layout.subsegpos == reshape(UInt32[1:8:4096...], (1, 512))
-    # @test layout.subsegpos == reshape(UInt32[1:8:4096...], (512, 1))
+    @test layout.subsegpos == reshape(UInt32[1:8:4096...], (512, 1))
+
+    # multiple D segments: 
+    bv = trues(4096 * 2)
+    layout = MappedBitVectorLayout(bv)
+    @test layout.is_dense == RankedBitVector(BitVector([1, 1]))
+    @test layout.segpos == UInt64[1, 4097]
+    @test layout.is_ddense == RankedBitVector(trues(1024))
+    @test layout.subsegpos == reshape(UInt32[1:8:8192...], (512, 2))
+
 end
 
 
@@ -55,7 +62,7 @@ end
     bv = falses(4096); bv[2000] = 1
     layout = MappedBitVectorLayout(bv)
     res = GSAD.locate_in_segment(layout, 1)
-    @test res == (true, true, 2000, 1, 1)
+    @test res == (false, false, 2000, 1, 1)
     
     bv = trues(4096)
     layout = MappedBitVectorLayout(bv)
@@ -69,17 +76,18 @@ end
     res = GSAD.locate_in_segment(layout, 11)
     @test res == (true, true, 9, 2, 3)
 
-    bv = trues(4096 * 2)
-    layout = MappedBitVectorLayout(bv)
-    res = GSAD.locate_in_segment(layout, 4096 + 1)
-    @test res == (true, true, 4097, 2, 1)
-    res = GSAD.locate_in_segment(layout, 4096 + 5)
-    @test res == (true, true, 4097, 2, 5)
-
     bv = [trues(4096); falses(4089); trues(1); falses(6)]
     layout = MappedBitVectorLayout(bv)
     res = GSAD.locate_in_segment(layout, 4097)
     @test res == (false, false, 4096 + 4090, 1, 1)
+
+    # multiple D segments:
+    bv = trues(4096 * 2)
+    layout = MappedBitVectorLayout(bv)
+    res = GSAD.locate_in_segment(layout, 4096 + 1)
+    @test res == (true, true, 4097, 513, 1)
+    res = GSAD.locate_in_segment(layout, 4096 + 5)
+    @test res == (true, true, 4097, 513, 5)
 end
 
 

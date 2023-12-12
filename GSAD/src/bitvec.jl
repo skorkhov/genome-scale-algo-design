@@ -181,9 +181,10 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     maxnseg = cld(maxrank, 64^2)
     maxnsubseg = 512  # div(64 ^ 2, 8) = log(2^64) ^ 2 / sqrt(log(2^64))
     
-    # size and ratio constants:
+    # lengths separating dense and sparse: 
     threshold_seg = 64 ^ 4          # log(n)^4
     threshold_subseg = Int(64 / 2)  # log(n) / 2
+    # 1-bit populations:
     pop_seg = 64 ^ 2                # log(n)^2
     pop_subseg = 8                  # sqrt(log(2^64))
 
@@ -194,10 +195,11 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     # initialize empty containers: 
     segpos = Vector{UInt64}(undef, maxnseg)
     is_dense = falses(maxnseg)
-    subsegpos = Matrix{UInt32}(undef, (maxnseg, maxnsubseg))
+    subsegpos = Matrix{UInt32}(undef, (maxnsubseg, maxnseg))
     is_ddense = falses(maxnsubseg)
+    is_ddense = falses(maxnseg * maxnsubseg)
     
-    # first pass to delineate segments: 
+    # first pass - init segment boundaries:
     i = 0
     local seg_start_i
     for j in 1:maxrank
@@ -221,7 +223,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
         # Idea: advance in increments of 64 if >= 64 bits remain to fill the seg
     end
 
-    # second pass to delineate subsegments:
+    # second pass - specify subsegments:
     # for all Dense _segments_
     local subseg_start_i
     nsegD = rank1(is_dense, nseg)  # TODO: should be replaced with a counter in previous pass
@@ -240,7 +242,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
             if jj % pop_subseg == 1
                 nsubseg += 1
                 subseg_start_i = i
-                subsegpos[segD_rank, iloc(nsubseg, maxnsubseg)] = i
+                subsegpos[iloc(nsubseg, maxnsubseg), segD_rank] = i
             end
 
             # If j is the end of Dd subsegment, set is_ddense; 
@@ -257,7 +259,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     # keep only the used capacity of layout arrayy:
     segpos = segpos[1:nseg]
     is_dense = is_dense[1:nseg]
-    subsegpos = subsegpos[1:nsegD, 1:min(nsubseg, maxnsubseg)]
+    subsegpos = subsegpos[1:min(nsubseg, maxnsubseg), 1:nsegD]
     is_ddense = is_ddense[1:nsubseg]
 
     MappedBitVectorLayout(segpos, is_dense, subsegpos, is_ddense)
@@ -424,7 +426,17 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
     return subseg_start_i + pos
 end
 
-"Type to store a bit ID location extracted from MappedBitVectorLayout"
+"""
+    locate_in_segment(layout::MappedBitVectorLayout, j::Integer)::Tuple{Bool, Bool, Int, Int, Int}
+
+Locate `j`th 1-bit in the `layout`; return a 5-tuple with location coordinates:
+-   `is_dense::Bool`: is in Dense segment? 
+-   `is_ddense::Bool`: is in Dense-dense subsegment? 
+-   `i_start::UInt`: start position of the sub-segment `j`th 1-bit is in
+-   `rank::UInt`: rank of the sub-segments `j`th bit is in among subsegments of
+    the same kind
+-   `jj::UInt`: position of the `j` bit relative to start of subsegment
+"""
 function locate_in_segment(layout::MappedBitVectorLayout, j::Integer)::Tuple{Bool, Bool, Int, Int, Int}
     # is jth 1-bit in a Dense segment? 
     seg_idx = cld(j, 4096)
@@ -442,11 +454,14 @@ function locate_in_segment(layout::MappedBitVectorLayout, j::Integer)::Tuple{Boo
         return is_dense, false, i_start, seg_rank, jj
     end
     
+    # segment is Dense:
+
     # is jth 1-bit in a Dd segment?
-    
+    # (segD_rank - 1) = num of D segments priot to this one, each with 512 subsegs
     subseg_idx = (segD_rank - 1) * div(4096, 8) + cld(jj, 8)
-    i_start = layout.subsegpos[subseg_idx]
     is_ddense = layout.is_ddense[subseg_idx]
+
+    i_start = layout.subsegpos[subseg_idx]
     subsegDd_rank = rank1(layout.is_ddense, subseg_idx)
     seg_rank = is_ddense ? subsegDd_rank : subseg_idx - subsegDd_rank
     jj = iloc(jj, 8)
