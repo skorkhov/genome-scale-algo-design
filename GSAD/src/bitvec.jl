@@ -121,27 +121,13 @@ end
 "Supertype for one-dimensional arrays with fast select()."
 abstract type AbstractMappedBitVector <: AbstractVector{Bool} end
 
-
-"Type to describe patially known container size/element."
-struct ContainerLayout{N, T}
-    dims::NTuple{N, Int}
-    isknown::Vector{Bool}
-
-    # TODO: implement initializer - could be needed for dynamically sized DS
-    # TODO: fix operations on ContainerLayout
-end
-
-@inline bitwidth(x::ContainerLayout{N, T}) where {N, T} = sizeof(T) * 8
-@inline size(x::ContainerLayout) = x.dims
-
-init(x::ContainerLayout{N, T}) where {N, T} = Assay{T, N}(undef, size(x))
-
 """
     MappedBitVectorLayout
 
 Type to store segment layout for MappedBitVector supporting O(1)-time select().
 """
 struct MappedBitVectorLayout
+    pop::UInt64
     segpos::Vector{UInt64}
     # need to know the rank of the dense chunk to undex into subsegpos
     is_dense::RankedBitVector
@@ -158,6 +144,7 @@ struct MappedBitVectorLayout
     # for n in 2^[32,64], 20-24 bits, or UInt32:
     # 
     # [number of D segs] x [512]
+    # TODO: redefine as a vector, not a matrix
     subsegpos::Matrix{UInt32}
 
     # total number of subsegments at the start of each dense segment
@@ -188,7 +175,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     pop_seg = 64 ^ 2                # log(n)^2
     pop_subseg = 8                  # sqrt(log(2^64))
 
-    # counters:
+    # keep track of num of sub/segs travered by loops:
     nseg = 0
     nsubseg = 0
 
@@ -196,7 +183,6 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     segpos = Vector{UInt64}(undef, maxnseg)
     is_dense = falses(maxnseg)
     subsegpos = Matrix{UInt32}(undef, (maxnsubseg, maxnseg))
-    is_ddense = falses(maxnsubseg)
     is_ddense = falses(maxnseg * maxnsubseg)
     
     # first pass - init segment boundaries:
@@ -230,7 +216,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     segD_idx = 0
     for segD_rank in 1:nsegD
         segD_idx = findnext(is_dense, segD_idx + 1)
-        segD_start_i = segpos[segD_idx]
+        segD_start_i = segpos[segD_idx]  # start of enclosing segment
 
         # for each subsegmet in a D segment:
         jj = 1
@@ -242,7 +228,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
             if jj % pop_subseg == 1
                 nsubseg += 1
                 subseg_start_i = i
-                subsegpos[iloc(nsubseg, maxnsubseg), segD_rank] = i
+                subsegpos[iloc(nsubseg, maxnsubseg), segD_rank] = i - segD_start_i + 1
             end
 
             # If j is the end of Dd subsegment, set is_ddense; 
@@ -262,70 +248,109 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     subsegpos = subsegpos[1:min(nsubseg, maxnsubseg), 1:nsegD]
     is_ddense = is_ddense[1:nsubseg]
 
-    MappedBitVectorLayout(segpos, is_dense, subsegpos, is_ddense)
-end
-
-
-
-"""
-    DdCache{T}
-
-Type to represent positions by rank for all possible Dense-dense sub-segments.
-
-Parameter T indicated the number of bits needed to represent max length of the 
-bitvector use with the DdCache object. The type represent a lookup table and 
-supports array-like behavior (provided by `size()` and `getindex()`), but with 
-the following exceptions: 
-
-- is indexed by bit sequences `bits` (1st idx) and 1-bit ranks `j` (2nd idx);
-- "stores" positions of `j`th bit in `bits`, which are computed on-the-fly in 
-  constant-boinded time.
-
-The array behavior is inspired by the possibility of actually caching pos values
-instead of computing them on demand. 
-"""
-struct DdCache{T} end
-dd64 = DdCache{UInt64}()
-dd32 = DdCache{UInt32}()
-
-@inline function Base.size(x::DdCache{T}) where T <: Unsigned
-    maxbits = sizeof(T) * 8
-    pop = ceil(Int, sqrt(maxbits))
-    # width = Int(2 ^ log2(maxbits / 2))
-    width = ceil(Int, maxbits / 2)
-    return pop, width
-end
-
-function Base.show(io::IO, ::MIME"text/plain", x::DdCache{T}) where T
-    s = size(x)
-    print(io, "$(s[1])-in-$(s[2]) DdCache{$T}")
+    MappedBitVectorLayout(maxrank, segpos, is_dense, subsegpos, is_ddense)
 end
 
 
 """
-    Base.getindex(::DdCache, bits::Unsigned, j::Integer)
+    InIntervalID
 
-Get position of `j`th 1-bit in bit sequence `bits`.
+Container type describing a position (of a particular bit) relative to a 
+`MappedBitVector` interval, where an interval can be Sparse (Ss), Dense-sparse 
+(Ds), or Dense-dense (Dd)
+
+See also [`MappedID`](@ref)
+
+# Fields
+-   i: interval index among intervals of the same generality
+-   r: interval rank among intervals of the same type
+-   j: rank of position relative to statrt of its enclising interval
+-   start: start position of interval in bitvector
+-   is_dense: is interval dense?
 """
-function Base.getindex(::DdCache, bits::Unsigned, j::Integer)
-    # check that j is in the bit vector:
-    jmax = count_ones(bits)
-    j > jmax && throw(DomainError)
+struct InIntervalID
+    i::UInt
+    r::UInt
+    j::UInt
+    start::UInt  # parameterize
+    is_dense::Bool
+end
 
-    # relies on sizeof(T) <= sizeof(BitVector chunk) = 64 bits
-    bv = falses(64)
-    bv.chunks[1] = bits
+InIntervalID() = InIntervalID(0, 0, 0, 0, false)
 
-    pos = 0
-    for _ in 1:j
-        pos += 1
-        pos = findnext(bv, pos)
+"""
+    MappedID
+
+Container type describing a position relative to a layout in [an instance of] 
+a `MappedBitVector` object.
+
+# Fields
+-   segment: bit position relative to the segment it is in;
+-   subsegment: bit position relative to the sub-segment it is in;
+
+The sub-segment ID `subsegment` will be initialized only if `segment.is_dense` 
+is `false`, i.e. if the position is in a Dense segment. Otherwise, if the 
+position is in a Sparse segment, the position description is complete without 
+any sub-segment information.
+"""
+struct MappedID
+    segment::InIntervalID
+    subsegment::InIntervalID
+end
+
+function MappedID(layout::MappedBitVectorLayout, j::Integer)
+    # is jth 1-bit in a Dense segment? 
+    i = cld(j, 4096)
+    r = rank1(layout.is_dense, i)
+    jj = iloc(j, 4096)
+    start = layout.segpos[i]
+    is_dense = layout.is_dense[i]
+    
+    segment = InIntervalID(i, r, jj, start, is_dense)
+    if !is_dense
+        return MappedID(segment, InIntervalID())
+    end
+
+    # segment is Dense:
+    i = (r - 1) * div(4096, 8) + cld(jj, 8)
+    r = rank1(layout.is_ddense, i)
+    jj = iloc(jj, 8)
+    start = layout.subsegpos[i]
+    is_ddense = layout.is_ddense[i]
+
+    subsegment = InIntervalID(i, r, jj, start, is_ddense)
+    return MappedID(segment, subsegment)
+end
+
+"Return start position of BlockID"
+function start_of(id::MappedID)
+    start = id.segment.start
+    !id.segment.is_dense && return start
+    
+    return start + id.subsegment.start - 1
+end
+
+"""
+    iterate(layout::MappedBitVectorLayout [, id::MappedID])
+
+Return coordinates, as a MappedID, of the next interval's start position.
+"""
+function iterate(layout::MappedBitVectorLayout, id::MappedID)
+    pop = layout.pop
+    j = (id.segment.i - 1) * 4096 + id.segment.j
+    if !id.segment.is_dense
+        # if in Sparse (Ss) segment:
+        jj = cld(j, 4096) * 4096 + 1
+    else
+        # if in Dense (Ds or Dd) sunsegment: 
+        jj = cld(j, 8) * 8 + 1
     end
     
-    pos
+    return jj > pop ? nothing : MappedID(layout, jj)
 end
 
-Base.getindex(A::DdCache, bits::Integer, j::Integer) = getindex(A, convert(Unsigned, bits), j)
+iterate(layout::MappedBitVectorLayout, id::Integer) = iterate(layout, MappedID(layout, id))
+iterate(layout::MappedBitVectorLayout) = layout.pop == 0 ? nothing : MappedID(layout, 1)
 
 """
     MappedBitVector
@@ -362,18 +387,55 @@ struct MappedBitVector <: AbstractMappedBitVector
     # size(.) = log(len(.)) = 5 bits => UInt8 (+ 3 extra bits)
     # count(.) = 8 positions to store (exactly)
     # Dd: [binomial(32, 8)] x [8]
-
-    # define this as a singleton type
-    # TODO: fix type of Dd cache... do we even need it?
+    # 
+    # In practice, Dd "cache" values are computed on the fly in a loop that's at
+    # most 8 iterations long. Hence, no slot needed for Dd cache.
     # Dd::DdCache{UInt64}
 
     function MappedBitVector(bits::T) where T <: AbstractVector{Bool}
         layout = MappedBitVectorLayout(bits)
-        Ss = Matrix{UInt32}(undef, ())
-        Ds = Matrix{UInt32}(undef, ())
+        Ss, Ds = initialize_caches(layout)
+        layout.pop == 0 && return new(bits, layout, Ss, Ds)
+        n = length(bits)
 
+        current = iterate(layout)
+        while current !== nothing
+            next = iterate(layout, current)
+            from = start_of(current)
+            to = next === nothing ? n : start_of(next) - 1
+            if !current.segment.is_dense
+                # Ss segment
+                r = current.segment.i - current.segment.r
+                cache = @views findall(bits[from, to])
+                Ss[1:length(cache), r] .= cache
+            else
+                if !current.subsegment.is_dense
+                    # Ds segment
+                    r = current.subsegment.i - current.subsegment.r
+                    cache = @views findall(bits[from, to])
+                    Ds[1:length(cache), r] .= cache
+                end
+            end
+
+            current = next
+        end
+        
         new(bits, layout, Ss, Ds)
     end
+end
+
+function initialize_caches(layout)
+    # num of Ss segments: 
+    nseg = length(layout.is_dense)
+    nsegD = sum(layout.is_dense)
+    # number of Ds subsegments
+    nsubseg = length(layout.is_ddense)
+    nsubsegDd = sum(layout.is_ddense)
+
+    Ss = Matrix{UInt32}(undef, (4096, nseg - nsegD))
+    Ds = Matrix{UInt32}(undef, (8, nsubseg - nsubsegDd))
+    
+    return Ss, Ds
 end
 
 
@@ -424,49 +486,4 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
     end
 
     return subseg_start_i + pos
-end
-
-"""
-    locate_in_segment(layout::MappedBitVectorLayout, j::Integer)::Tuple{Bool, Bool, Int, Int, Int}
-
-Locate `j`th 1-bit in the `layout`; return a 5-tuple with location coordinates:
--   `is_dense::Bool`: is in Dense segment? 
--   `is_ddense::Bool`: is in Dense-dense subsegment? 
--   `i_start::UInt`: start position of the sub-segment `j`th 1-bit is in
--   `rank::UInt`: rank of the sub-segments `j`th bit is in among subsegments of
-    the same kind
--   `jj::UInt`: position of the `j` bit relative to start of subsegment
-"""
-function locate_in_segment(layout::MappedBitVectorLayout, j::Integer)::Tuple{Bool, Bool, Int, Int, Int}
-    # is jth 1-bit in a Dense segment? 
-    seg_idx = cld(j, 4096)
-    is_dense = layout.is_dense[seg_idx]
-    
-    # rank among segments of the same type: 
-    segD_rank = rank1(layout.is_dense, seg_idx)
-    seg_rank = is_dense ? segD_rank : seg_idx - segD_rank
-    
-    i_start = layout.segpos[seg_idx]  # segment start pos
-    jj = iloc(j, 4096)                # j relative to segment start
-    
-    # if segment is Sparse
-    if ~ is_dense
-        return is_dense, false, i_start, seg_rank, jj
-    end
-    
-    # segment is Dense:
-
-    # is jth 1-bit in a Dd segment?
-    # (segD_rank - 1) = num of D segments priot to this one, each with 512 subsegs
-    subseg_idx = (segD_rank - 1) * div(4096, 8) + cld(jj, 8)
-    is_ddense = layout.is_ddense[subseg_idx]
-
-    i_start = layout.subsegpos[subseg_idx]
-    subsegDd_rank = rank1(layout.is_ddense, subseg_idx)
-    seg_rank = is_ddense ? subsegDd_rank : subseg_idx - subsegDd_rank
-    jj = iloc(jj, 8)
-
-    # TODO: use the result in select1() to infer offsets and query the cache
-    # return: tuple (is_dense::Bool, is_ddense::Bool, start_i::Int, seg_rank::Int, jj::Int)
-    return is_dense, is_ddense, i_start, seg_rank, jj
 end
