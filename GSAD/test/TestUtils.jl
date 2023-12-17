@@ -65,6 +65,13 @@ function test_rank1(::Type{T}) where T
     bitvec = convert(BitVector, v)
     @test rank1(bitvec, 55) == rank1(v, 55)
     @test rank1(bitvec, 300) == rank1(v, 300)
+
+    # edge case: rank(..., i) where i=WIDTH_BLOCK * n
+    # ensure maskr is donne correctly
+    bitvec = trues(256)  # one full block
+    v = convert(T, bitvec)
+    # v = RankedBitVector(bitvector)
+    @test rank1(v, 256) == 256
 end
 
 """

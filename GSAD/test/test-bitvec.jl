@@ -21,6 +21,19 @@ include("TestUtils.jl")
     blocks = UInt32[0, 5]
     @test v.chunks == chunks
     @test v.blocks == blocks
+
+    # test weird edge case: 
+    bitvector = [trues(512); repeat(BitVector([1, 0]), 256)]
+    v = RankedBitVector(bitvector)
+    @test length(v.chunks) == cld(length(v), GSAD.WIDTH_CHUNK)
+    @test length(v.blocks) == cld(length(v), GSAD.WIDTH_BLOCK)
+    blocks = UInt32[0, 256, 512, 640]
+    chunks = UInt8[
+        0, 64, 128, 192, 0, 64, 128, 192,
+        0, 32, 64, 96, 0, 32, 64, 96
+    ]
+    @test v.chunks == chunks
+    @test v.blocks == blocks
 end
 
 @testset "rank1(::RankedBitVector, ...)" TestUtils.test_rank1(RankedBitVector)
@@ -57,6 +70,54 @@ end
     @test layout.segpos == UInt64[1, 4097]
     @test layout.is_ddense == RankedBitVector(trues(1024))
     @test layout.subsegpos == hcat([1:8:4096...], [1:8:4096...])
+
+    # D: Ds x 512
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv = repeat(bv_subseg_Ds, 512)
+    layout = MappedBitVectorLayout(bv)
+    @test layout.pop == UInt64(4096)
+    @test layout.is_dense == RankedBitVector(BitVector([1]))
+    @test layout.segpos == UInt64[1]
+    @test layout.is_ddense == RankedBitVector(falses(512))
+    # subsegpos: 
+    exp = UInt32[1 + 40i for i in 0:(512 - 1)]
+    @test layout.subsegpos == reshape(exp, (512, 1))
+
+    # D: alternating Dd/Ds
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Dd = trues(8)
+    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
+    bv = bv_seg_D_mixed
+    layout = MappedBitVectorLayout(bv)
+    @test layout.pop == UInt64(4096)
+    @test layout.is_dense == RankedBitVector(BitVector([1]))
+    @test layout.segpos == UInt64[1]
+    @test layout.is_ddense == RankedBitVector(BitVector([i % 2 == 1 for i in 1:512]))
+    # subsegpos: 
+    # alternating chunks of 8+40 bits long (Dd+Ds, up to a whole seg)
+    exp = vcat([[1, 9] .+ 48 * i for i in 0:255]...)
+    @test layout.subsegpos == reshape(exp, (512, 1))
+
+    # Dd + S + D(d/s)
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Dd = trues(8)
+    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
+    bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
+    bv = [
+        trues(4096); 
+        bv_seg_S; 
+        bv_seg_D_mixed
+    ]
+    layout = MappedBitVectorLayout(bv)
+    @test layout.pop == UInt64(4096 * 3)
+    @test layout.is_dense == RankedBitVector(BitVector([1, 0, 1]))
+    @test layout.segpos == UInt64[1, 4097, 4096 + 64^4 + 1]
+    @test layout.is_ddense == RankedBitVector([trues(512); [i % 2 == 1 for i in 1:512]])
+    exp = hcat(
+        [1:8:4096...], 
+        vcat([[1, 9] .+ 48 * i for i in 0:255]...)
+    )
+    @test layout.subsegpos == exp
 
     # all bits are 0: 
     bv = falses(4096 * 2)
@@ -108,6 +169,28 @@ end
     res = GSAD.MappedID(layout, 4096 + 1)
     @test res.segment == GSAD.InIntervalID(2, 2, 1, 4097, true)
     @test res.subsegment == GSAD.InIntervalID(513, 513, 1, 1, true)
+
+    # Dd + S + D(d/s)
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Dd = trues(8)
+    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
+    bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
+    bv = [
+        trues(4096); 
+        bv_seg_S; 
+        bv_seg_D_mixed
+    ]
+    layout = MappedBitVectorLayout(bv)
+    # test:
+    # edge case showing up for the last subsegment of the DS;
+    # test last-1:
+    res = GSAD.MappedID(layout, 4096 + 4096 + 4096 - 8 - 7)
+    @test res.segment == GSAD.InIntervalID(3, 2, 4096 - 8 - 7, 4096 + 64^4 + 1, true)
+    @test res.subsegment == GSAD.InIntervalID(1023, 512 + 256, 1, length(bv_seg_D_mixed) - 39 - 8, true)
+    # test last: 
+    res = GSAD.MappedID(layout, 4096 + 4096 + 4096 - 7)
+    @test res.segment == GSAD.InIntervalID(3, 2, 4096 - 7, 4096 + 64^4 + 1, true)
+    @test res.subsegment == GSAD.InIntervalID(1024, 512 + 256, 1, length(bv_seg_D_mixed) - 39, false)
 
     # all bits are 0:
     bv = falses(4096 * 2)
@@ -171,3 +254,38 @@ end
     id = GSAD.MappedID(layout, 4096 + 4096 + 2048 + 1)
     @test GSAD.start_of(id) == 4096 + 64^4 + 2048 + 1
 end
+
+@testset "MappedBitVector()" begin
+    # D + S + D segments:
+    bv_sparse = [trues(4095); falses(64^4 - 4096); trues(1)]
+    bv = [
+        trues(4096); 
+        bv_sparse; 
+        trues(2048 + 1); falses(2045); trues(2048 - 1)
+    ]
+    res = MappedBitVector(bv)
+    @test res.bits == bv
+    # @test res.layout == MappedBitVectorLayout(bv)  # TODO: implement equality
+    @test res.Ss == reshape([1:4095..., 64^4], (4096, 1))
+    @test res.Ds == reshape([1; 2046 .+ [1:7...]], (8, 1))
+
+    # Dd + S + D(d/s)
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Dd = trues(8)
+    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
+    bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
+    bv = [
+        trues(4096); 
+        bv_seg_S; 
+        bv_seg_D_mixed
+    ]
+    res = MappedBitVector(bv)
+    @test res.bits == bv
+    @test res.Ss == reshape([1:4095..., 64^4], (4096, 1))
+    @test res.Ds == reshape(
+        repeat([1 + 5i for i in 0:7], 256), 
+        (8, 256)
+    )
+end
+
+

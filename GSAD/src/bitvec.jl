@@ -78,7 +78,7 @@ function rank1_unsafe(v::AbstractRankedBitVector, i::Integer)
     @inbounds r = (
         convert(Int, v.chunks[i_chunk - chunk_offset_in_block]) << 32 +
         v.blocks[i_block] + 
-        count_ones(chunk & maskr(typeof(chunk), i % WIDTH_CHUNK))
+        count_ones(chunk & maskr(typeof(chunk), (i - 1) % WIDTH_CHUNK + 1))
     )
     if chunk_offset_in_block != 0 
         @inbounds r += v.chunks[i_chunk]
@@ -234,7 +234,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
             # If j is the end of Dd subsegment, set is_ddense; 
             # if an end of a subseg is never reached, 
             # the subseg will remain Ds (by is_ddense indialization).
-            if (jj % pop_subseg == 0) && (1 - subseg_start_i + 1 < threshold_subseg)
+            if (jj % pop_subseg == 0) && (i - subseg_start_i < threshold_subseg)
                 is_ddense[nsubseg] = true
             end
 
@@ -406,13 +406,13 @@ struct MappedBitVector <: AbstractMappedBitVector
             if !current.segment.is_dense
                 # Ss segment
                 r = current.segment.i - current.segment.r
-                cache = @views findall(bits[from, to])
+                cache = findall(view(bits, from:to))
                 Ss[1:length(cache), r] .= cache
             else
                 if !current.subsegment.is_dense
                     # Ds segment
                     r = current.subsegment.i - current.subsegment.r
-                    cache = @views findall(bits[from, to])
+                    cache = findall(view(bits, from:to))
                     Ds[1:length(cache), r] .= cache
                 end
             end
