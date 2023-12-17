@@ -21,7 +21,7 @@ structure, we stored intermediate ranks because the output we needed was a rank.
         - `size(.) = log(n)`
 
     - _sparse_ `S` (high 1-bit packing) = `len(S) > log(n) ^ 4`
-        - `count(.)` has to be compited after all chunks are classified
+        - `count(.)` has to be compiled after all chunks are classified
         - pre-calculate the position of each 1-bit in a sparse chunk; 
         - for each sparse chunk
             - vector of positions, indexed by rank of 1 at each position
@@ -48,19 +48,23 @@ structure, we stored intermediate ranks because the output we needed was a rank.
 **Example:**
 
 For an up to `64^4`-bit-long vector with less than 4096 1-bits, and no
-Dense-dense chunk (a chunk with at least 8 1-bits within a 32-bit wide span),
-all 1-bit positions will be cached.[^ex] The max size of such data structure would 
-assume 7 1-bits for every 32, or `7n/32` positions, each taking up 32 bits of 
-storage, or `32 * 7n/32  >  log(n) * 7n/32` bits to store the positions; and
-`32 * n/8 > log(n)` bits to store sub-segment offsets. 
+Dense-dense chunk (a chunk with at least 8 1-bits within a 32 bit-wide span),
+all 1-bit positions will be cached.[^ex] The max size of such data structure 
+would assume 7 1-bits for every 32, or `7n/32` positions, each taking up 32 bits
+of storage, or `32 * 7n/32  >  log(n) * 7n/32` bits to store the positions; and
+`32 * n/8 > log(n)` bits to store sub-segment offsets. The storage is still 
+linear, although, for vectors much shorter than 2^64, with a lot of waster bits
+in the size of integers used to store cached values. 
 
 [^ex] This is a bit vector with 1 Dense segment full of Dense-sparse 
 sub-segments; the example is valid for n up to `64^4`.
 
 **Conclusion:**
-<!-- TODO: fix conclusion -->
 
-Statically sized data structure for `select()` operations is O(n), but is worse 
-than that for smaller sequences since the sizes/densities of different kinds of 
-caches (Sparse, Dense-sparse, and Dense-dense) are anchored to the max allowed 
-bitvector length of 2^64 (very large bitvector length).
+Statically sized data structure for `select()` operations is O(n) in space, but 
+with a lot of extra unused space in when the bi vectors are short. Since the DS
+is static (don't support any updating), it may make sense to scale int sizes and
+dims of caches based on the input size. 
+
+For the first version, just use the safe "oversized" version meant for bit 
+vectors up to `2^64` bits. 

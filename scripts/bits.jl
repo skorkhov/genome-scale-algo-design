@@ -219,3 +219,84 @@ bv2 = RankedBitVector(bv)
 IndexableBitVectors.rank1(bv0, len)
 IndexableBitVectors.rank1(bv1, len)
 Int(GSAD.rank1(bv2, len))
+
+
+
+# TODO: Experiment - findnext(::BitVector, i) high i and crossing chunk boundaries
+# is it linear in n or in the number of 1-bits in the vector?
+bv = [falses(60); trues(1)]
+@btime findnext($bv, 1)
+@btime findnext($bv, 30)
+@btime findnext($bv, 60)
+
+bv = [falses(64); trues(1)]
+@btime findnext($bv, 1)
+@btime findnext($bv, 32)
+@btime findnext($bv, 64)
+@btime findnext($bv, 65)
+
+bv = [falses(1_000); trues(1)]
+@btime findnext($bv, 1)
+@btime findnext($bv, 1_000)
+
+# Experiment - test if findall depends on population and/or length of vector
+# Conclusion: 
+# - allocations are the main effect on time for boolean vectors (?)
+# - bit vectors are faster than boolean vectors (between 5 and 40)
+# - bit vectors scale linearly in length(.)/64; faster than linear in population
+# - boolean vectors scale linearly in length and log10(.) in population
+# - boolean vectors scale in population due to increased output size allocation
+
+# vary population in fixed length:
+n = 1_000_000
+p = 100
+# bv = falses(n);
+bv = fill(false, (n, ));
+pos = randperm(n)[1:p];
+bv[pos] .= true;
+@btime findall($bv);
+
+p = 1_000
+# bv = falses(n);
+bv = fill(false, (n, ));
+pos = randperm(n)[1:p];
+bv[pos] .= true;
+@btime findall($bv);
+
+p = 10_000
+# bv = falses(n);
+bv = fill(false, (n, ));
+pos = randperm(n)[1:p];
+bv[pos] .= true;
+@btime findall($bv);
+
+p = 100_000
+# bv = falses(n);
+bv = fill(false, (n, ));
+pos = randperm(n)[1:p];
+bv[pos] .= true;
+@btime findall($bv);
+
+# vary length for fixed population:
+p = 100
+
+n = 1_000
+bv = falses(n);
+# bv = fill(false, (n, ));
+pos = randperm(n)[1:p];
+bv[pos] .= true;
+@btime findall($bv);
+
+n = 1_000_000
+bv = falses(n);
+# bv = fill(false, (n, ));
+pos = randperm(n)[1:p];
+bv[pos] .= true;
+@btime findall($bv);
+
+n = 10_000_000
+bv = falses(n);
+# bv = fill(false, (n, ));
+pos = randperm(n)[1:p];
+bv[pos] .= true;
+@btime findall($bv);
