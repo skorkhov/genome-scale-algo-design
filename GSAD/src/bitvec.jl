@@ -362,6 +362,7 @@ struct MappedBitVector <: AbstractMappedBitVector
     layout::MappedBitVectorLayout
     
     # cache tables: 
+    # TODO: store cached position relative to the start of enclosing interval (e.g. -1)
 
     # Sparse: stores position of each 1 bit
     # size(elem) = log(n)
@@ -445,45 +446,39 @@ end
 Compute position of 1-bit with rank k in O(1) time.
 """
 function select1(v::AbstractMappedBitVector, j::Integer)
-    # check: j < rank(v, length(v))
-    # cannot be checked in constant time without using a ranked bit vector
+    if j < 0 || v.layout.pop < j
+        throw(BoundsError(v, j))
+    end
+    
     return select1_unsafe(v, j)
 end
 
 function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
-    seg_idx = cld(j, 4096)                         # segment index
-    seg_start_i = v.layout.segpos[seg_idx]         # segment start pos
-    segD_rank = rank1(v.layout.is_dense, seg_idx)  # rank among dense segments
-    jj = iloc(i, 4096)                             # j relative to segment start
-    
-    is_dense = v.layout.is_dense[seg_idx]
-    # if sparse chunk, query directly from sparse lookup table
-    if !is_dense
-        return seg_start_i + v.Ss[seg_idx - segD_rank, jj]
+    id = MappedID(v.layout, j)
+    start = id.segment.start
+
+    # j in Ss segment:
+    if !id.segment.is_dense
+        r = id.segment.i - id.segment.r
+        # TODO: remove `-1` when position in caches is relative to interval start
+        return start + v.Ss[id.segment.j, r] - 1
     end
 
-    subseg_idx_rel = cld(jj, 8)
-    subseg_start_i = seg_start_i + v.layout.subsegpos[segD_rank, subseg_idx_rel]
-    jj = iloc(jj, 8)  # j relative to subsegment start
+    # TODO: set subsegment to start relative to the enclosing segment, as an offset
+    start += id.subsegment.start - 1
     
-    # get subsegment type:
-    subseg_idx::Int = segD_rank * div(4096, 8) + subseg_idx_rel
-    is_ddense = v.layout.is_ddense[subseg_idx]
-
-    if is_ddense
-        # for Dd, look for jj'th 1-bit starting from beginning of subseg;
-        # not constant time,
-        # but bounded by pop(subseg_Dd)
-        pos = subseg_start_i - 1
-        for _ in 1:jj  # not constant time but bounded by 8
-            pos = findnext(v.bits, pos + 1)
-        end
-    else 
-        # query dirctly in Ds
-        subsegDd_rank = rank1(v.layout.is_ddense, subseg_idx)
-        which_subseg_sparse = subseg_idx - subsegDd_rank
-        pos = v.Ds[which_subseg_sparse, jj]
+    # j in Ds sub-segment
+    if !id.subsegment.is_dense
+        r = id.subsegment.i - id.subsegment.r
+        @show Int(start), Int(r)
+        return start + v.Ds[id.subsegment.j, r] - 1
+    end
+    
+    # j in Dd sub-segment:
+    pos = start - 1
+    for _ in 1:id.subsegment.j
+        pos = findnext(v.bits, pos + 1)
     end
 
-    return subseg_start_i + pos
+    return pos
 end

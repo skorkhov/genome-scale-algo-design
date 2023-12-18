@@ -288,4 +288,21 @@ end
     )
 end
 
+@testset "select1(::MappedBitVector, j)" begin
+    # Dd + S + D(d/s)
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Dd = trues(8)
+    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
+    bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
+    bv = MappedBitVector([trues(4096); bv_seg_S; bv_seg_D_mixed])
+    @test select1(bv, 4096) == 4096
+    @test select1(bv, 4096 + 4095) == 4096 + 4095
+    @test select1(bv, 4096 + 4096) == 4096 + 64^4
+    @test select1(bv, 4096 + 4096 + 4096) == 4096 + 64^4 + length(bv_seg_D_mixed) - 4
+
+    # test bounds error:
+    @test_throws BoundsError select1(bv, 4096 * 3 + 1)
+end
+
+
 
