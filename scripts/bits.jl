@@ -300,3 +300,24 @@ bv = falses(n);
 pos = randperm(n)[1:p];
 bv[pos] .= true;
 @btime findall($bv);
+
+
+
+# Experiment - are select1(::MappedBitVector) operations ~constant time? 
+using Random
+using GSAD
+using BenchmarkTools
+bitvector = bitrand(1_000_000_000)
+v1 = MappedBitVector(bitvector)
+v2 = RankedBitVector(bitvector)
+
+j = 10_000_000
+@btime select1($v1, $j)
+@btime select1($v2, $j)
+
+j = 5_000
+@btime select1($v1, $j)
+@btime select1($v2, $j)
+j = 5_007
+@btime select1($v1, $j)
+@btime select1($v2, $j)
