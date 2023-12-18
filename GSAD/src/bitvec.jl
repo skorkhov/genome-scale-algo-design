@@ -439,6 +439,21 @@ function initialize_caches(layout)
     return Ss, Ds
 end
 
+function Base.show(io::IO, x::MappedBitVector)
+    text = "MappedBitVector (l=$(length(x.bits)), p=$(Int(x.layout.pop)))"
+    println(io, text)
+end
+
+function Base.show(io::IO, mime::MIME"text/plain", x::MappedBitVector)
+    text = [
+        "MappedBitVector:",
+        "\n",
+        "    len: $(length(x.bits))", 
+        "\n", 
+        "    pop: $(Int(x.layout.pop))"
+    ]
+    println(io, reduce(*, text))
+end
 
 """
     select1(v::AbstractMappedBitVector, j::Integer)
@@ -449,7 +464,7 @@ function select1(v::AbstractMappedBitVector, j::Integer)
     if j < 0 || v.layout.pop < j
         throw(BoundsError(v, j))
     end
-    
+
     return select1_unsafe(v, j)
 end
 
