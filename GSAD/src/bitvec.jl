@@ -144,13 +144,7 @@ struct MappedBitVectorLayout
     # for n in 2^[32,64], 20-24 bits, or UInt32:
     # 
     # [number of D segs] x [512]
-    # TODO: redefine as a vector, not a matrix
-    subsegpos::Matrix{UInt32}
-
-    # total number of subsegments at the start of each dense segment
-    # equals rank(is_dense, seg_idx) * subsegments per segment
-    # len(.) = [number of D segs] = same as nrow(subsegpos)
-    # cumsubsegpos::Vector{UInt32}
+    subsegpos::Vector{UInt32}
 
     # is a given sub-segment dense (Ds)? 
     # rank of the sub-segment among sub-segments of the same kind? - 
@@ -177,12 +171,13 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
 
     # keep track of num of sub/segs travered by loops:
     nseg = 0
+    nsegD = 0
     nsubseg = 0
 
     # initialize empty containers: 
     segpos = Vector{UInt64}(undef, maxnseg)
     is_dense = falses(maxnseg)
-    subsegpos = Matrix{UInt32}(undef, (maxnsubseg, maxnseg))
+    subsegpos = Vector{UInt32}(undef, maxnsubseg * maxnseg)
     is_ddense = falses(maxnseg * maxnsubseg)
     
     # first pass - init segment boundaries:
@@ -204,6 +199,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
         # the segment remains indicated as Sparse (by is_dense initialization).
         if (j % pop_seg == 0) && (i - seg_start_i + 1 < threshold_seg)
             is_dense[nseg] = true
+            nsegD += 1
         end
 
         # Idea: advance in increments of 64 if >= 64 bits remain to fill the seg
@@ -212,9 +208,8 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     # second pass - specify subsegments:
     # for all Dense _segments_
     local subseg_start_i
-    nsegD = rank1(is_dense, nseg)  # TODO: should be replaced with a counter in previous pass
     segD_idx = 0
-    for segD_rank in 1:nsegD
+    for _ in 1:nsegD
         segD_idx = findnext(is_dense, segD_idx + 1)
         segD_start_i = segpos[segD_idx]  # start of enclosing segment
 
@@ -228,7 +223,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
             if jj % pop_subseg == 1
                 nsubseg += 1
                 subseg_start_i = i
-                subsegpos[iloc(nsubseg, maxnsubseg), segD_rank] = i - segD_start_i + 1
+                subsegpos[nsubseg] = i - segD_start_i
             end
 
             # If j is the end of Dd subsegment, set is_ddense; 
@@ -245,7 +240,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     # keep only the used capacity of layout arrayy:
     segpos = segpos[1:nseg]
     is_dense = is_dense[1:nseg]
-    subsegpos = subsegpos[1:min(nsubseg, maxnsubseg), 1:nsegD]
+    subsegpos = subsegpos[1:nsubseg]
     is_ddense = is_ddense[1:nsubseg]
 
     MappedBitVectorLayout(maxrank, segpos, is_dense, subsegpos, is_ddense)
@@ -322,12 +317,12 @@ function MappedID(layout::MappedBitVectorLayout, j::Integer)
     return MappedID(segment, subsegment)
 end
 
-"Return start position of BlockID"
+"Return start position of MappedID"
 function start_of(id::MappedID)
     start = id.segment.start
     !id.segment.is_dense && return start
     
-    return start + id.subsegment.start - 1
+    return start + id.subsegment.start
 end
 
 """
@@ -362,7 +357,6 @@ struct MappedBitVector <: AbstractMappedBitVector
     layout::MappedBitVectorLayout
     
     # cache tables: 
-    # TODO: store cached position relative to the start of enclosing interval (e.g. -1)
 
     # Sparse: stores position of each 1 bit
     # size(elem) = log(n)
@@ -404,16 +398,20 @@ struct MappedBitVector <: AbstractMappedBitVector
             next = iterate(layout, current)
             from = start_of(current)
             to = next === nothing ? n : start_of(next) - 1
+            
+            # store withing-(sub)segment positions;
+            # note: cache-1 adjust from index to offset 
+            # relative to the start of enclosing interval
             if !current.segment.is_dense
                 # Ss segment
                 r = current.segment.i - current.segment.r
-                cache = findall(view(bits, from:to))
+                cache = findall(view(bits, from:to)) .- 1
                 Ss[1:length(cache), r] .= cache
             else
                 if !current.subsegment.is_dense
                     # Ds segment
                     r = current.subsegment.i - current.subsegment.r
-                    cache = findall(view(bits, from:to))
+                    cache = findall(view(bits, from:to)) .- 1
                     Ds[1:length(cache), r] .= cache
                 end
             end
@@ -476,17 +474,16 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
     if !id.segment.is_dense
         r = id.segment.i - id.segment.r
         # TODO: remove `-1` when position in caches is relative to interval start
-        return start + v.Ss[id.segment.j, r] - 1
+        return start + v.Ss[id.segment.j, r]
     end
 
     # TODO: set subsegment to start relative to the enclosing segment, as an offset
-    start += id.subsegment.start - 1
+    start += id.subsegment.start
     
     # j in Ds sub-segment
     if !id.subsegment.is_dense
         r = id.subsegment.i - id.subsegment.r
-        @show Int(start), Int(r)
-        return start + v.Ds[id.subsegment.j, r] - 1
+        return start + v.Ds[id.subsegment.j, r]
     end
     
     # j in Dd sub-segment:

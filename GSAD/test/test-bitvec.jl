@@ -50,7 +50,7 @@ end
     @test layout.pop == UInt64(4)
     @test layout.segpos == UInt64[1]
     @test layout.is_dense == RankedBitVector(BitVector([0]))
-    @test layout.subsegpos == Matrix{UInt32}(undef, (0, 0))
+    @test layout.subsegpos == UInt32[]
     @test layout.is_ddense == RankedBitVector(BitVector())
 
     # D + S[one element]
@@ -60,7 +60,7 @@ end
     @test layout.is_dense == RankedBitVector(BitVector([1, 0]))
     @test layout.segpos == UInt64[1, 4097]
     @test layout.is_ddense == RankedBitVector(trues(512))
-    @test layout.subsegpos == reshape([1:8:4096...], (512, 1))
+    @test layout.subsegpos == UInt32[0:8:4095...]
 
     # multiple D segments: 
     bv = trues(4096 * 2)
@@ -69,7 +69,7 @@ end
     @test layout.is_dense == RankedBitVector(BitVector([1, 1]))
     @test layout.segpos == UInt64[1, 4097]
     @test layout.is_ddense == RankedBitVector(trues(1024))
-    @test layout.subsegpos == hcat([1:8:4096...], [1:8:4096...])
+    @test layout.subsegpos == UInt32[[0:8:4095...]; [0:8:4095...]]
 
     # D: Ds x 512
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
@@ -80,8 +80,7 @@ end
     @test layout.segpos == UInt64[1]
     @test layout.is_ddense == RankedBitVector(falses(512))
     # subsegpos: 
-    exp = UInt32[1 + 40i for i in 0:(512 - 1)]
-    @test layout.subsegpos == reshape(exp, (512, 1))
+    @test layout.subsegpos == UInt32[40i for i in 0:(512 - 1)]
 
     # D: alternating Dd/Ds
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
@@ -95,8 +94,7 @@ end
     @test layout.is_ddense == RankedBitVector(BitVector([i % 2 == 1 for i in 1:512]))
     # subsegpos: 
     # alternating chunks of 8+40 bits long (Dd+Ds, up to a whole seg)
-    exp = vcat([[1, 9] .+ 48 * i for i in 0:255]...)
-    @test layout.subsegpos == reshape(exp, (512, 1))
+    @test layout.subsegpos == vcat([[0, 8] .+ 48 * i for i in 0:255]...)
 
     # Dd + S + D(d/s)
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
@@ -113,10 +111,10 @@ end
     @test layout.is_dense == RankedBitVector(BitVector([1, 0, 1]))
     @test layout.segpos == UInt64[1, 4097, 4096 + 64^4 + 1]
     @test layout.is_ddense == RankedBitVector([trues(512); [i % 2 == 1 for i in 1:512]])
-    exp = hcat(
-        [1:8:4096...], 
-        vcat([[1, 9] .+ 48 * i for i in 0:255]...)
-    )
+    exp = UInt32[
+        [0:8:4095...];
+        vcat([[0, 8] .+ 48 * i for i in 0:255]...)
+    ]
     @test layout.subsegpos == exp
 
     # all bits are 0: 
@@ -125,7 +123,7 @@ end
     @test layout.pop == UInt64(0)
     @test layout.segpos == UInt64[]
     @test layout.is_dense == RankedBitVector(BitVector())
-    @test layout.subsegpos == Matrix{UInt32}(undef, (0, 0))
+    @test layout.subsegpos == UInt32[]
     @test layout.is_ddense == RankedBitVector(BitVector())
 end
 
@@ -143,13 +141,13 @@ end
     layout = MappedBitVectorLayout(bv)
     res = GSAD.MappedID(layout, 1)
     @test res.segment == GSAD.InIntervalID(1, 1, 1, 1, true)
-    @test res.subsegment == GSAD.InIntervalID(1, 1, 1, 1, true)
+    @test res.subsegment == GSAD.InIntervalID(1, 1, 1, 0, true)
     res = GSAD.MappedID(layout, 9)
     @test res.segment == GSAD.InIntervalID(1, 1, 9, 1, true)
-    @test res.subsegment == GSAD.InIntervalID(2, 2, 1, 9, true)
+    @test res.subsegment == GSAD.InIntervalID(2, 2, 1, 8, true)
     res = GSAD.MappedID(layout, 11)
     @test res.segment == GSAD.InIntervalID(1, 1, 11, 1, true)
-    @test res.subsegment == GSAD.InIntervalID(2, 2, 3, 9, true)
+    @test res.subsegment == GSAD.InIntervalID(2, 2, 3, 8, true)
 
     # D + S segments:
     bv = [trues(4096); falses(4089); trues(1); falses(6)]
@@ -164,11 +162,11 @@ end
     # in 1st segment:
     res = GSAD.MappedID(layout, 2000 + 1)
     @test res.segment == GSAD.InIntervalID(1, 1, 2001, 1, true)
-    @test res.subsegment == GSAD.InIntervalID(251, 251, 1, 2001, true)
+    @test res.subsegment == GSAD.InIntervalID(251, 251, 1, 2000, true)
     # in 2nd segment: 
     res = GSAD.MappedID(layout, 4096 + 1)
     @test res.segment == GSAD.InIntervalID(2, 2, 1, 4097, true)
-    @test res.subsegment == GSAD.InIntervalID(513, 513, 1, 1, true)
+    @test res.subsegment == GSAD.InIntervalID(513, 513, 1, 0, true)
 
     # Dd + S + D(d/s)
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
@@ -186,11 +184,11 @@ end
     # test last-1:
     res = GSAD.MappedID(layout, 4096 + 4096 + 4096 - 8 - 7)
     @test res.segment == GSAD.InIntervalID(3, 2, 4096 - 8 - 7, 4096 + 64^4 + 1, true)
-    @test res.subsegment == GSAD.InIntervalID(1023, 512 + 256, 1, length(bv_seg_D_mixed) - 39 - 8, true)
+    @test res.subsegment == GSAD.InIntervalID(1023, 512 + 256, 1, length(bv_seg_D_mixed) - 40 - 8, true)
     # test last: 
     res = GSAD.MappedID(layout, 4096 + 4096 + 4096 - 7)
     @test res.segment == GSAD.InIntervalID(3, 2, 4096 - 7, 4096 + 64^4 + 1, true)
-    @test res.subsegment == GSAD.InIntervalID(1024, 512 + 256, 1, length(bv_seg_D_mixed) - 39, false)
+    @test res.subsegment == GSAD.InIntervalID(1024, 512 + 256, 1, length(bv_seg_D_mixed) - 40, false)
 
     # all bits are 0:
     bv = falses(4096 * 2)
@@ -266,8 +264,8 @@ end
     res = MappedBitVector(bv)
     @test res.bits == bv
     # @test res.layout == MappedBitVectorLayout(bv)  # TODO: implement equality
-    @test res.Ss == reshape([1:4095..., 64^4], (4096, 1))
-    @test res.Ds == reshape([1; 2046 .+ [1:7...]], (8, 1))
+    @test res.Ss == reshape([0:4094..., 64^4 - 1], (4096, 1))
+    @test res.Ds == reshape([0; 2045 .+ [1:7...]], (8, 1))
 
     # Dd + S + D(d/s)
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
@@ -281,11 +279,8 @@ end
     ]
     res = MappedBitVector(bv)
     @test res.bits == bv
-    @test res.Ss == reshape([1:4095..., 64^4], (4096, 1))
-    @test res.Ds == reshape(
-        repeat([1 + 5i for i in 0:7], 256), 
-        (8, 256)
-    )
+    @test res.Ss == reshape([0:4094..., 64^4 - 1], (4096, 1))
+    @test res.Ds == reshape(repeat([5i for i in 0:7], 256), (8, 256))
 end
 
 @testset "select1(::MappedBitVector, j)" begin
