@@ -8,3 +8,5 @@ using Random
 @testset "bit utils" include("test-bitutils.jl")
 @testset "RankedBitVector" include("test-bitvec.jl")
 @testset "CachedBitVector" include("test-bitcache.jl")
+@testset "SelectBitVector" include("test-select.jl")
+

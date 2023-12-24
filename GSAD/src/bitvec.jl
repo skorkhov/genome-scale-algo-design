@@ -1,5 +1,3 @@
-"Supertype for one-dimensional arrays with fast rank()."
-abstract type AbstractRankedBitVector <: AbstractVector{Bool} end
 
 """
     RankedBitVector
@@ -48,11 +46,7 @@ Base.size(x::AbstractRankedBitVector) = (length(x),)
 Base.convert(::Type{BitVector}, x::AbstractRankedBitVector) = x.bits
 Base.convert(::Type{T}, x::BitVector) where T <: AbstractRankedBitVector = RankedBitVector(x)
 
-Base.show(io::IO, x::RankedBitVector) = Base.show(io, x.bits)
-# for some reason is necessary to make printing work in the terminal: 
-Base.show(io::IO, ::MIME"text/plain", x::RankedBitVector) = print(io, "RankedBitVector: ", x.bits)
-
-Base.getindex(A::AbstractRankedBitVector, i::Integer) = getindex(A.bits, i)
+Base.getindex(A::AbstractRankedBitVector, i::Integer) = Base.getindex(A.bits, i)
 Base.firstindex(A::AbstractRankedBitVector) = firstindex(A.bits)
 Base.lastindex(A) = lastindex(A.bits)
 
@@ -117,9 +111,6 @@ function select1(v::AbstractRankedBitVector, j)
 end
 
 
-
-"Supertype for one-dimensional arrays with fast select()."
-abstract type AbstractMappedBitVector <: AbstractVector{Bool} end
 
 """
     MappedBitVectorLayout
@@ -437,22 +428,6 @@ function initialize_caches(layout)
     return Ss, Ds
 end
 
-function Base.show(io::IO, x::MappedBitVector)
-    text = "MappedBitVector (l=$(length(x.bits)), p=$(Int(x.layout.pop)))"
-    println(io, text)
-end
-
-function Base.show(io::IO, mime::MIME"text/plain", x::MappedBitVector)
-    text = [
-        "MappedBitVector:",
-        "\n",
-        "    len: $(length(x.bits))", 
-        "\n", 
-        "    pop: $(Int(x.layout.pop))"
-    ]
-    println(io, reduce(*, text))
-end
-
 """
     select1(v::AbstractMappedBitVector, j::Integer)
 
@@ -473,11 +448,9 @@ function select1_unsafe(v::AbstractMappedBitVector, j::Integer)
     # j in Ss segment:
     if !id.segment.is_dense
         r = id.segment.i - id.segment.r
-        # TODO: remove `-1` when position in caches is relative to interval start
         return start + v.Ss[id.segment.j, r]
     end
 
-    # TODO: set subsegment to start relative to the enclosing segment, as an offset
     start += id.subsegment.start
     
     # j in Ds sub-segment
