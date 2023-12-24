@@ -40,6 +40,41 @@ end
 end
 
 
+#=  =#
+
+@testset "Layout" begin
+    LayoutSegment = GSAD.LayoutSegment
+    LayoutSubSegment = GSAD.LayoutSubSegment
+    Layout = GSAD.Layout
+
+    # Dd + S + D(d/s)
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Dd = trues(8)
+    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
+    bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
+    bv = [trues(4096); bv_seg_S; bv_seg_D_mixed]
+
+    layout = Layout(bv)
+    segments = map(
+        LayoutSegment, 
+        [1, 4096 + 1, 4096 + 64^4 + 1],
+        [1, 1, 2],
+        [true, false, true]
+    )
+    subsegments = map(
+        LayoutSubSegment, 
+        [[0:8:4095...]; vcat([[0, 8] .+ 48 * i for i in 0:255]...)], 
+        [1:512...; 512 .+ repeat(1:256, inner = 2)], 
+        [repeat([true], 512); repeat([true, false], 256)]
+    )
+
+    @test layout.segments == segments
+    @test layout.subsegments == subsegments
+end
+
+
+
+
 #= MappedBitVector =#
 
 @testset "MappedBitVectorLayout()" begin

@@ -13,7 +13,7 @@ function select(v::AbstractMappedBitVector, j::Integer)
     return select_unsafe(v, j)
 end
 
-index_in_interval(j) = Tuple(CartesianIndices((1:8, 1:512, 1:4096))[j])
+index_in_layout(j) = Tuple(CartesianIndices((1:8, 1:512, 1:4096))[j])
 
 
 #= SelectBitVector =#
@@ -97,7 +97,7 @@ end
 Base.sum(v::SelectBitVector) = v.population
 
 function select_unsafe(v::SelectBitVector, j::Integer)
-    jj, isubseg, iseg = index_in_interval(j)
+    jj, isubseg, iseg = index_in_layout(j)
     segment = v.intervals[iseg]
     # if j in Sparse segment, access directly in cache: 
     if typeof(segment) isa SegmentSparse
@@ -133,6 +133,82 @@ end
 
 #= MappedBitVector =#
 
+# TODO: MappedBitVectorLayout --> Layout
+# TODO: drop population from Layout and add MappedBitVector
+# TODO: implement getindex(::Layout, ...); define segment type
+# TODO: simplify Layout constructor; use just one density vec
+# TODO: in tests, remove namespace references in non-exported methods
+
+struct LayoutSegment
+    start::UInt32
+    rank::UInt32
+    dense::Bool
+end
+
+struct LayoutSubSegment
+    offset::UInt32
+    rank::UInt32
+    dense::Bool
+end
+
+struct Layout
+    segments::Vector{LayoutSegment}
+    subsegments::Vector{LayoutSubSegment}
+end
+
+function Layout(bits::T) where T <: AbstractVector{Bool}
+    pos = findall(bits)
+    pop = length(pos)
+
+    nseg = cld(pop, SEG_POPULATION)
+    segments = Vector{LayoutSegment}(undef, nseg)
+    segrank = 0
+    for iseg in 1:nseg
+        from = (iseg - 1) * SEG_POPULATION + 1
+        to = min(from + SEG_POPULATION - 1, pop)
+        if (to - from < SEG_POPULATION - 1) || 
+            (pos[to] - pos[from] >= SEG_DENSE_MAXWIDTH - 1)
+            # sparse segment:
+            segments[iseg] = LayoutSegment(pos[from], segrank, false)
+        else
+            # dense segment:
+            segrank += 1
+            segments[iseg] = LayoutSegment(pos[from], segrank, true)
+        end
+    end
+
+    nsubseg = segrank * N_SUBSEG_PER_SEG
+    subsegments = Vector{LayoutSubSegment}(undef, nsubseg)
+    subsegrank = 0
+    for iseg in 1:nseg
+        if segments[iseg].dense
+            segstart = segments[iseg].start
+            n_in_prev_sparse_seg = (iseg - segments[iseg].rank) * SEG_POPULATION
+            
+            # subseg indexes to assign:
+            from_subseg = (segments[iseg].rank - 1) * N_SUBSEG_PER_SEG + 1
+            to_subseg = min(from_subseg + N_SUBSEG_PER_SEG - 1, nsubseg)
+            for isubseg in from_subseg:to_subseg
+                # select position array indexes to consider: 
+                from = n_in_prev_sparse_seg + (isubseg - 1) * SUBSEG_POPULATION + 1
+                to = min(from + SUBSEG_POPULATION - 1, pop)
+                offset = pos[from] - segstart
+                if pos[to] - pos[from] >= SUBSEG_DENSE_MAXWIDTH - 1
+                    # D-sparse sub-segment:
+                    subsegments[isubseg] = LayoutSubSegment(offset, subsegrank, false)
+                else 
+                    # D-dense sub-segment:
+                    subsegrank += 1
+                    subsegments[isubseg] = LayoutSubSegment(offset, subsegrank, true)
+                end
+            end
+        end
+    end
+
+    Layout(segments, subsegments)
+end
+
+
 """
     MappedBitVectorLayout
 
@@ -155,7 +231,7 @@ struct MappedBitVectorLayout
     # need to store log(log(n)^4) bits per position; 
     # for n in 2^[32,64], 20-24 bits, or UInt32:
     # 
-    # [number of D segs] x [512]
+    # Vector: [number of D segs] x [512]
     subsegpos::Vector{UInt32}
 
     # is a given sub-segment dense (Ds)? 
@@ -168,11 +244,9 @@ end
 @inline iloc(i::Integer, size::Integer) = (i - 1) % size + 1
 
 function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
-    n = length(bits)
-    # TODO: don't use rank on bits - don't need it
-    maxrank = rank(bits, n)           # max number of set bits
+    maxrank = sum(bits)
     maxnseg = cld(maxrank, 64^2)
-    maxnsubseg = 512  # div(64 ^ 2, 8) = log(2^64) ^ 2 / sqrt(log(2^64))
+    maxnsubseg = 512
     
     # lengths separating dense and sparse: 
     threshold_seg = 64 ^ 4          # log(n)^4
@@ -189,6 +263,7 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
     # initialize empty containers: 
     segpos = Vector{UInt64}(undef, maxnseg)
     is_dense = falses(maxnseg)
+    # TODO: replace "estimate" with exact number of subsegs needed after first loop
     subsegpos = Vector{UInt32}(undef, maxnsubseg * maxnseg)
     is_ddense = falses(maxnseg * maxnsubseg)
     
@@ -213,8 +288,6 @@ function MappedBitVectorLayout(bits::T) where T <: AbstractVector{Bool}
             is_dense[nseg] = true
             nsegD += 1
         end
-
-        # Idea: advance in increments of 64 if >= 64 bits remain to fill the seg
     end
 
     # second pass - specify subsegments:
