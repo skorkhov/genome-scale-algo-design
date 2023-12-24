@@ -70,7 +70,7 @@ end
 
 #= test rank() and select() =#
 
-@testset "rank1(::CachedBitVector, ...)" TestUtils.test_rank1(CachedBitVector)
-@testset "rank1(::CachedBitVector, ...) mem-intensive" TestUtils.test_rank1_memlimit(CachedBitVector)
-# @testset "select1(::RankedBitVector, ...)" test_select1(RankedBitVector)
+@testset "rank(::CachedBitVector, ...)" TestUtils.test_rank(CachedBitVector)
+@testset "rank(::CachedBitVector, ...) mem-intensive" TestUtils.test_rank_memlimit(CachedBitVector)
+# @testset "select(::RankedBitVector, ...)" test_select(RankedBitVector)
 

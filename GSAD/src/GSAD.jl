@@ -15,7 +15,7 @@ abstract type AbstractMappedBitVector <: AbstractVector{Bool} end
 include("intro.jl")
 include("reference.jl")
 include("bitutils.jl")
-include("bitvec.jl")
+include("rank.jl")
 include("bitcache.jl")
 include("select.jl")
 include("show.jl")
@@ -30,7 +30,7 @@ export
     MappedBitVectorLayout,
     SelectBitVector,
     # methods:
-    rank1,
-    select1
+    rank,
+    select
 
 end # module GSAD

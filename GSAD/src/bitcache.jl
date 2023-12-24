@@ -119,7 +119,7 @@ Base.show(io::IO, x::CachedBitVector) = Base.print(x.bits)
 # for some reason is necessary to make printing work in the terminal: 
 Base.show(io::IO, ::MIME"text/plain", z::CachedBitVector) = print(io, "CachedBitVector: ", z.bits)
 
-function rank1(v::CachedBitVector, i::Integer)
+function rank(v::CachedBitVector, i::Integer)
     stored_short, pos = divrem(i, WIDTH_CHUNK)
     stored_long = fld(stored_short, CHUNKS_PER_BLOCK) + 1
 

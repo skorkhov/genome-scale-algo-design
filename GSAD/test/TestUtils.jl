@@ -40,69 +40,69 @@ end
 
 #= test rank() and select() operation on indexed vectors =#
 
-function test_rank1(::Type{T}) where T
+function test_rank(::Type{T}) where T
     # short vector with one chunk: 
     v = make_bitvec_small(T)
-    @test rank1(v, 2) == 2
-    @test rank1(v, 3) == 3
-    @test rank1(v, 4) == 3
-    @test rank1(v, 8) == 4
+    @test rank(v, 2) == 2
+    @test rank(v, 3) == 3
+    @test rank(v, 4) == 3
+    @test rank(v, 8) == 4
 
     # long vector with 5 chunks
     v = make_bitvec_5chunk(T)
-    @test rank1(v, 2) == 2
-    @test rank1(v, 3) == 2
+    @test rank(v, 2) == 2
+    @test rank(v, 3) == 2
     # second short chunk:
-    @test rank1(v, 65) == 4
-    @test rank1(v, 67) == 5
+    @test rank(v, 65) == 4
+    @test rank(v, 67) == 5
     # rigth after long chunk:
-    @test rank1(v, 257) == 5
-    @test rank1(v, 260) == 6
+    @test rank(v, 257) == 5
+    @test rank(v, 260) == 6
 
     # compare optimized results with slow reference implementation
     # for a long-ish bitvector:
     v = make_bitrand(T, 100_000)
     bitvec = convert(BitVector, v)
-    @test rank1(bitvec, 55) == rank1(v, 55)
-    @test rank1(bitvec, 300) == rank1(v, 300)
+    @test rank(bitvec, 55) == rank(v, 55)
+    @test rank(bitvec, 300) == rank(v, 300)
 
     # edge case: rank(..., i) where i=WIDTH_BLOCK * n
     # ensure maskr is donne correctly
     bitvec = trues(256)  # one full block
     v = convert(T, bitvec)
     # v = RankedBitVector(bitvector)
-    @test rank1(v, 256) == 256
+    @test rank(v, 256) == 256
 end
 
 """
-    test_rank1_memlimit(::Type{T}) where T
+    test_rank_memlimit(::Type{T}) where T
 
 Test rank operation on long bitvectors.
 
 For bitvectors beyond len=2^32, both long and short cache slots have to be used 
 to store long cache val. Test handling of such vals via this fucntion.
 """
-function test_rank1_memlimit(::Type{T}) where T
+function test_rank_memlimit(::Type{T}) where T
     v = make_bitvec_memlimit(T)
-    @test rank1(v, 1000) == UInt64(1000)
-    @test rank1(v, 2^32 + 1) == UInt64(2^32 + 1)
+    @test rank(v, 1000) == UInt64(1000)
+    @test rank(v, 2^32 + 1) == UInt64(2^32 + 1)
 end
 
-function test_select1(::Type{T}) where T
+function test_select(::Type{T}) where T
     v = make_bitvec_small(T)
-    @test select1(v, 4) == 6
+    @test select(v, 4) == 6
     # catching edge cases at low counts: 
-    @test select1(v, 1) == 1
-    @test select1(v, 2) == 2
-    @test select1(v, 3) == 3
-    @test_throws DomainError select1(v, 10)
+    @test select(v, 1) == 1
+    @test select(v, 2) == 2
+    @test select(v, 3) == 3
+    @test_throws DomainError select(v, 10)
 
     v = make_bitvec_5chunk(T)
-    @test select1(v, 4) == 5
-    @test select1(v, 5) == 67
+    @test select(v, 4) == 5
+    @test select(v, 5) == 67
 end
 
-function test_select1_memlimit(::Type{T}) where T
+function test_select_memlimit(::Type{T}) where T
     nothing
 end
 
