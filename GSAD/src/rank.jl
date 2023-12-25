@@ -50,6 +50,8 @@ Base.getindex(A::AbstractRankedBitVector, i::Integer) = Base.getindex(A.bits, i)
 Base.firstindex(A::AbstractRankedBitVector) = firstindex(A.bits)
 Base.lastindex(A) = lastindex(A.bits)
 
+Base.sum(v::AbstractRankedBitVector) = rank(v, length(v))
+
 """
     rank(v::RankedBitVector, i::Integer)
 
