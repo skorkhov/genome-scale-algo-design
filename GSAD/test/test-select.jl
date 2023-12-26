@@ -75,53 +75,7 @@ end
 
 #= MappedBitVector =#
 
-@testset "MappedBitVectorLayout()" begin
-    # basic generator on a short vector: 
-    bv = TestUtils.make_bitvec_small(BitVector)
-    layout = MappedBitVectorLayout(bv)
-    @test layout.segpos == UInt64[1]
-    @test layout.is_dense == RankedBitVector(BitVector([0]))
-    @test layout.subsegpos == UInt32[]
-    @test layout.is_ddense == RankedBitVector(BitVector())
-
-    # D + S[one element]
-    bv = trues(4096 + 1)
-    layout = MappedBitVectorLayout(bv)
-    @test layout.is_dense == RankedBitVector(BitVector([1, 0]))
-    @test layout.segpos == UInt64[1, 4097]
-    @test layout.is_ddense == RankedBitVector(trues(512))
-    @test layout.subsegpos == UInt32[0:8:4095...]
-
-    # multiple D segments: 
-    bv = trues(4096 * 2)
-    layout = MappedBitVectorLayout(bv)
-    @test layout.is_dense == RankedBitVector(BitVector([1, 1]))
-    @test layout.segpos == UInt64[1, 4097]
-    @test layout.is_ddense == RankedBitVector(trues(1024))
-    @test layout.subsegpos == UInt32[[0:8:4095...]; [0:8:4095...]]
-
-    # D: Ds x 512
-    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
-    bv = repeat(bv_subseg_Ds, 512)
-    layout = MappedBitVectorLayout(bv)
-    @test layout.is_dense == RankedBitVector(BitVector([1]))
-    @test layout.segpos == UInt64[1]
-    @test layout.is_ddense == RankedBitVector(falses(512))
-    # subsegpos: 
-    @test layout.subsegpos == UInt32[40i for i in 0:(512 - 1)]
-
-    # D: alternating Dd/Ds
-    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
-    bv_subseg_Dd = trues(8)
-    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
-    bv = bv_seg_D_mixed
-    layout = MappedBitVectorLayout(bv)
-    @test layout.is_dense == RankedBitVector(BitVector([1]))
-    @test layout.segpos == UInt64[1]
-    @test layout.is_ddense == RankedBitVector(BitVector([i % 2 == 1 for i in 1:512]))
-    # subsegpos: 
-    # alternating chunks of 8+40 bits long (Dd+Ds, up to a whole seg)
-    @test layout.subsegpos == vcat([[0, 8] .+ 48 * i for i in 0:255]...)
+@testset "MappedBitVector()" begin
 
     # Dd + S + D(d/s)
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
@@ -133,53 +87,33 @@ end
         bv_seg_S; 
         bv_seg_D_mixed
     ]
-    layout = MappedBitVectorLayout(bv)
-    @test layout.is_dense == RankedBitVector(BitVector([1, 0, 1]))
-    @test layout.segpos == UInt64[1, 4097, 4096 + 64^4 + 1]
-    @test layout.is_ddense == RankedBitVector([trues(512); [i % 2 == 1 for i in 1:512]])
+    res = MappedBitVector(bv)
+    @test res.bits == bv
+    # layout: 
+    @test res.is_dense == RankedBitVector(BitVector([1, 0, 1]))
+    @test res.segpos == UInt64[1, 4097, 4096 + 64^4 + 1]
+    @test res.is_ddense == RankedBitVector([trues(512); [i % 2 == 1 for i in 1:512]])
     exp = UInt32[
         [0:8:4095...];
         vcat([[0, 8] .+ 48 * i for i in 0:255]...)
     ]
-    @test layout.subsegpos == exp
+    @test res.subsegpos == exp
+    # caches: 
+    @test res.Ss == reshape([0:4094..., 64^4 - 1], (4096, 1))
+    @test res.Ds == reshape(repeat([5i for i in 0:7], 256), (8, 256))
 
     # all bits are 0: 
     bv = falses(4096 * 2)
-    layout = MappedBitVectorLayout(bv)
-    @test layout.segpos == UInt64[]
-    @test layout.is_dense == RankedBitVector(BitVector())
-    @test layout.subsegpos == UInt32[]
-    @test layout.is_ddense == RankedBitVector(BitVector())
-end
-
-@testset "MappedBitVector()" begin
-    # D + S + D segments:
-    bv_sparse = [trues(4095); falses(64^4 - 4096); trues(1)]
-    bv = [
-        trues(4096); 
-        bv_sparse; 
-        trues(2048 + 1); falses(2045); trues(2048 - 1)
-    ]
     res = MappedBitVector(bv)
     @test res.bits == bv
-    # @test res.layout == MappedBitVectorLayout(bv)  # TODO: implement equality
-    @test res.Ss == reshape([0:4094..., 64^4 - 1], (4096, 1))
-    @test res.Ds == reshape([0; 2045 .+ [1:7...]], (8, 1))
-
-    # Dd + S + D(d/s)
-    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
-    bv_subseg_Dd = trues(8)
-    bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
-    bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
-    bv = [
-        trues(4096); 
-        bv_seg_S; 
-        bv_seg_D_mixed
-    ]
-    res = MappedBitVector(bv)
-    @test res.bits == bv
-    @test res.Ss == reshape([0:4094..., 64^4 - 1], (4096, 1))
-    @test res.Ds == reshape(repeat([5i for i in 0:7], 256), (8, 256))
+    # layout:
+    @test res.segpos == UInt64[]
+    @test res.is_dense == RankedBitVector(BitVector())
+    @test res.subsegpos == UInt32[]
+    @test res.is_ddense == RankedBitVector(BitVector())
+    # caches: 
+    @test res.Ss == Matrix{UInt32}(undef, (4096, 0))
+    @test res.Ds == Matrix{UInt32}(undef, (8, 0))
 end
 
 @testset "select(::MappedBitVector, j)" begin

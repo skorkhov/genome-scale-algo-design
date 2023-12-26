@@ -11,7 +11,7 @@ Base.show(io::IO, ::MIME"text/plain", x::RankedBitVector) = print(io, "RankedBit
 # MappedBitVector
 
 function Base.show(io::IO, x::MappedBitVector)
-    text = "MappedBitVector (l=$(length(x.bits)), p=$(Int(x.layout.pop)))"
+    text = "MappedBitVector (l=$(length(x.bits)), p=$(Int(x.population)))"
     println(io, text)
 end
 
@@ -21,7 +21,7 @@ function Base.show(io::IO, mime::MIME"text/plain", x::MappedBitVector)
         "\n",
         "    len: $(length(x.bits))", 
         "\n", 
-        "    pop: $(Int(x.layout.pop))"
+        "    pop: $(Int(x.population))"
     ]
     println(io, reduce(*, text))
 end
