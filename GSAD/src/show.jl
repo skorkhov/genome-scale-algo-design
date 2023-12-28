@@ -1,23 +1,23 @@
 # show methods for custom types in the package
 
 # =======
-# RankedBitVector
+# BitVectorRA
 
-Base.show(io::IO, x::RankedBitVector) = Base.show(io, x.bits)
-Base.show(io::IO, ::MIME"text/plain", x::RankedBitVector) = print(io, "RankedBitVector: ", x.bits)
+Base.show(io::IO, x::BitVectorRA) = Base.show(io, x.bits)
+Base.show(io::IO, ::MIME"text/plain", x::BitVectorRA) = print(io, "BitVectorRA: ", x.bits)
 
 
 # ======= 
-# MappedBitVector
+# BitVectorRSA
 
-function Base.show(io::IO, x::MappedBitVector)
-    text = "MappedBitVector (l=$(length(x.bits)), p=$(Int(x.population)))"
+function Base.show(io::IO, x::BitVectorRSA)
+    text = "BitVectorRSA (l=$(length(x.bits)), p=$(Int(x.population)))"
     println(io, text)
 end
 
-function Base.show(io::IO, mime::MIME"text/plain", x::MappedBitVector)
+function Base.show(io::IO, mime::MIME"text/plain", x::BitVectorRSA)
     text = [
-        "MappedBitVector:",
+        "BitVectorRSA:",
         "\n",
         "    len: $(length(x.bits))", 
         "\n", 

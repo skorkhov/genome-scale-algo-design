@@ -1,11 +1,11 @@
 # data structure for O(1)-time/O(n)-space select() operation on bit vectors
 
 """
-    select(v::AbstractMappedBitVector, j::Integer)
+    select(v::AbstractBitVectorRSA, j::Integer)
 
 Compute position of `j`-th 1-bit in `v`.
 """
-function select(v::AbstractMappedBitVector, j::Integer)
+function select(v::AbstractBitVectorRSA, j::Integer)
     if j < 0 || sum(v) < j
         throw(BoundsError(v, j))
     end
@@ -28,7 +28,7 @@ function index_in_layout(j)
     return iseg, isubseg, jj
 end
 
-#= SelectBitVector =#
+#= BitVectorSA =#
 
 # Implementation inspired by the idea of storing interval offsets and position 
 # caches in ragged arrays (wrapped in resp types for Sparse, Dense-sparce, and 
@@ -64,13 +64,13 @@ Base.getindex(A::SegmentSparse, isubseg, jj) = Base.getindex(A, (isubseg - 1) * 
 
 Segment = Union{SegmentSparse, SegmentDense}
 
-struct SelectBitVector <: AbstractMappedBitVector
+struct BitVectorSA <: AbstractBitVectorRSA
     bits::BitVector
     population::UInt64
     # offset caches:
     intervals::Vector{Segment}
 
-    function SelectBitVector(bits::T) where T <: AbstractVector{Bool}
+    function BitVectorSA(bits::T) where T <: AbstractVector{Bool}
         pop = sum(bits)
         intervals = Vector{Segment}(undef, cld(pop, 4096))
     
@@ -106,9 +106,9 @@ struct SelectBitVector <: AbstractMappedBitVector
     end
 end
 
-Base.sum(v::SelectBitVector) = v.population
+Base.sum(v::BitVectorSA) = v.population
 
-function select_unsafe(v::SelectBitVector, j::Integer)
+function select_unsafe(v::BitVectorSA, j::Integer)
     iseg, isubseg, jj = index_in_layout(j)
     segment = v.intervals[iseg]
     # if j in Sparse segment, access directly in cache: 
@@ -215,39 +215,39 @@ function LayoutIntRank(bits::T) where T <: AbstractVector{Bool}
 end
 
 
-#= MappedBitVector =#
+#= BitVectorRSA =#
 
-# TODO: implement type stability for select(::MappedBitVector)
-# TODO: support rank on MappedBitVector; rename BitVectorRSA
+# TODO: implement type stability for select(::BitVectorRSA)
+# TODO: support rank on BitVectorRSA; rename BitVectorRSA
 # TODO: document BitVectorRSA
 
 """
-    MappedBitVector
+    BitVectorRSA
     
 Data Structure to support O(1)-time select() queries on bit vectors. 
 """
-struct MappedBitVector <: AbstractMappedBitVector
-    bits::BitVector
+struct BitVectorRSA <: AbstractBitVectorRSA
+    bits::BitVectorRA
     population::UInt64
 
     # layout:
-    segpos::Vector{UInt64}
-    is_dense::RankedBitVector
-    subsegpos::Vector{UInt32}
-    is_ddense::RankedBitVector
+    segstart::Vector{UInt64}
+    is_dense::BitVectorRA
+    subsegoffset::Vector{UInt32}
+    is_ddense::BitVectorRA
     
     # cache tables:
     Ss::Matrix{UInt32}  # SEG_POPULATION x [nsegsparse]
     Ds::Matrix{UInt32}  # SUBSEG_POPULATION x [nsubsegsparse]
 
-    function MappedBitVector(bits::T) where T <: AbstractVector{Bool}
+    function BitVectorRSA(bits::T) where T <: AbstractVector{Bool}
         pos = findall(bits)
         pop = length(pos)
         
         # Segment data
         # layout: 
         nseg = cld(pop, SEG_POPULATION)
-        segpos = Vector{UInt64}(undef, nseg)
+        segstart = Vector{UInt64}(undef, nseg)
         is_dense = falses(nseg)
         # cache:
         Ss = Matrix{UInt32}(undef, (SEG_POPULATION, nseg))
@@ -256,7 +256,7 @@ struct MappedBitVector <: AbstractMappedBitVector
         for iseg in 1:nseg
             from = (iseg - 1) * SEG_POPULATION + 1
             to = min(from + SEG_POPULATION - 1, pop)
-            segpos[iseg] = pos[from]
+            segstart[iseg] = pos[from]
     
             # segment is Sparse when either:
             # - it has fewer 1-bits than SEG_POPULATION; or
@@ -276,7 +276,7 @@ struct MappedBitVector <: AbstractMappedBitVector
         # Sub-segment data
         # layout:
         nsubseg = segrank * N_SUBSEG_PER_SEG
-        subsegpos = Vector{UInt32}(undef, nsubseg)
+        subsegoffset = Vector{UInt32}(undef, nsubseg)
         is_ddense = falses(nsubseg)
         # cache:
         Ds = Matrix{UInt32}(undef, (SUBSEG_POPULATION, nsubseg))
@@ -286,7 +286,7 @@ struct MappedBitVector <: AbstractMappedBitVector
         for iseg in 1:nseg
             if is_dense[iseg]
                 segrank += 1
-                segstart = segpos[iseg]
+                isegstart = segstart[iseg]
                 
                 n_from_sparse = (iseg - segrank) * SEG_POPULATION
                 
@@ -298,7 +298,7 @@ struct MappedBitVector <: AbstractMappedBitVector
                     # consider the following position array indexes:
                     from = n_from_sparse + (isubseg - 1) * SUBSEG_POPULATION + 1
                     to = from + SUBSEG_POPULATION - 1
-                    subsegpos[isubseg] = pos[from] - segstart
+                    subsegoffset[isubseg] = pos[from] - isegstart
                     if pos[to] - pos[from] + 1 >= SUBSEG_DENSE_MAXWIDTH
                         # D-sparse sub-segment:
                         is_ddense[isubseg] = false
@@ -314,7 +314,7 @@ struct MappedBitVector <: AbstractMappedBitVector
 
         new(
             bits, pop,
-            segpos, is_dense, subsegpos, is_ddense, 
+            segstart, is_dense, subsegoffset, is_ddense, 
             Ss[:, 1:(nseg - segrank)], 
             Ds[:, 1:(nsubseg - subsegrank)]
         )
@@ -322,13 +322,13 @@ struct MappedBitVector <: AbstractMappedBitVector
 
 end
 
-Base.sum(v::MappedBitVector) = v.population
+Base.sum(v::BitVectorRSA) = v.population
 
-function select_unsafe(v::AbstractMappedBitVector, j::Integer)
+function select_unsafe(v::AbstractBitVectorRSA, j::Integer)
     # Bit in Sparse segment: 
     iseg, jj = index_in_interval(j, SEG_POPULATION)
     isegsparse = iseg - rank(v.is_dense, iseg)
-    segstart = v.segpos[iseg]
+    segstart = v.segstart[iseg]
     if !v.is_dense[iseg]
         offset = v.Ss[jj, isegsparse]
         return segstart + offset
@@ -337,7 +337,7 @@ function select_unsafe(v::AbstractMappedBitVector, j::Integer)
     # bit in Dense-sparse sub-segment:
     relsubseg, jj = index_in_interval(jj, SUBSEG_POPULATION)
     isubseg = isegsparse * N_SUBSEG_PER_SEG + relsubseg
-    subsegoffset = v.subsegpos[isubseg]
+    subsegoffset = v.subsegoffset[isubseg]
     if !v.is_ddense[isubseg]
         isubseg = (isegsparse - 1) * N_SUBSEG_PER_SEG + isubseg
         isubsegsparse = isubseg - rank(v.is_ddense, isubseg)

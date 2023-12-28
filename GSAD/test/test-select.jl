@@ -7,7 +7,7 @@ using GSAD
 include("TestUtils.jl")
 
 
-#= SelectBitVector =#
+#= BitVectorSA =#
 
 @testset "partition(::Vector)" begin
     partition = GSAD.partition
@@ -22,13 +22,13 @@ include("TestUtils.jl")
     @test partition(v, 5) == [[11:15...], [16:20...]]
 end
 
-@testset "select(::SelectBitVector, j)" begin
+@testset "select(::BitVectorSA, j)" begin
     # Dd + S + D(d/s)
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
     bv_subseg_Dd = trues(8)
     bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
     bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
-    bv = SelectBitVector([trues(4096); bv_seg_S; bv_seg_D_mixed])
+    bv = BitVectorSA([trues(4096); bv_seg_S; bv_seg_D_mixed])
     
     @test select(bv, 4096) == 4096
     @test select(bv, 4096 + 4095) == 4096 + 4095
@@ -73,9 +73,9 @@ end
 end
 
 
-#= MappedBitVector =#
+#= BitVectorRSA =#
 
-@testset "MappedBitVector()" begin
+@testset "BitVectorRSA()" begin
 
     # Dd + S + D(d/s)
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
@@ -87,42 +87,42 @@ end
         bv_seg_S; 
         bv_seg_D_mixed
     ]
-    res = MappedBitVector(bv)
+    res = BitVectorRSA(bv)
     @test res.bits == bv
     # layout: 
-    @test res.is_dense == RankedBitVector(BitVector([1, 0, 1]))
-    @test res.segpos == UInt64[1, 4097, 4096 + 64^4 + 1]
-    @test res.is_ddense == RankedBitVector([trues(512); [i % 2 == 1 for i in 1:512]])
+    @test res.is_dense == BitVectorRA(BitVector([1, 0, 1]))
+    @test res.segstart == UInt64[1, 4097, 4096 + 64^4 + 1]
+    @test res.is_ddense == BitVectorRA([trues(512); [i % 2 == 1 for i in 1:512]])
     exp = UInt32[
         [0:8:4095...];
         vcat([[0, 8] .+ 48 * i for i in 0:255]...)
     ]
-    @test res.subsegpos == exp
+    @test res.subsegoffset == exp
     # caches: 
     @test res.Ss == reshape([0:4094..., 64^4 - 1], (4096, 1))
     @test res.Ds == reshape(repeat([5i for i in 0:7], 256), (8, 256))
 
     # all bits are 0: 
     bv = falses(4096 * 2)
-    res = MappedBitVector(bv)
+    res = BitVectorRSA(bv)
     @test res.bits == bv
     # layout:
-    @test res.segpos == UInt64[]
-    @test res.is_dense == RankedBitVector(BitVector())
-    @test res.subsegpos == UInt32[]
-    @test res.is_ddense == RankedBitVector(BitVector())
+    @test res.segstart == UInt64[]
+    @test res.is_dense == BitVectorRA(BitVector())
+    @test res.subsegoffset == UInt32[]
+    @test res.is_ddense == BitVectorRA(BitVector())
     # caches: 
     @test res.Ss == Matrix{UInt32}(undef, (4096, 0))
     @test res.Ds == Matrix{UInt32}(undef, (8, 0))
 end
 
-@testset "select(::MappedBitVector, j)" begin
+@testset "select(::BitVectorRSA, j)" begin
     # Dd + S + D(d/s)
     bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
     bv_subseg_Dd = trues(8)
     bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
     bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
-    bv = MappedBitVector([trues(4096); bv_seg_S; bv_seg_D_mixed])
+    bv = BitVectorRSA([trues(4096); bv_seg_S; bv_seg_D_mixed])
     @test select(bv, 4096) == 4096
     @test select(bv, 4096 + 4095) == 4096 + 4095
     @test select(bv, 4096 + 4096) == 4096 + 64^4

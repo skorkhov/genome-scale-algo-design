@@ -70,7 +70,7 @@ function test_rank(::Type{T}) where T
     # ensure maskr is donne correctly
     bitvec = trues(256)  # one full block
     v = convert(T, bitvec)
-    # v = RankedBitVector(bitvector)
+    # v = BitVectorRA(bitvector)
     @test rank(v, 256) == 256
 end
 

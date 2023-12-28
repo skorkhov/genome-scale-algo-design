@@ -17,10 +17,10 @@ const N_SUBSEG_PER_SEG::Int = SEG_POPULATION / SUBSEG_POPULATION
 #= Types =# 
 
 "Supertype for one-dimensional bitvectors with fast rank()."
-abstract type AbstractRankedBitVector <: AbstractVector{Bool} end
+abstract type AbstractBitVectorRA <: AbstractVector{Bool} end
 
 "Supertype for one-dimensional bitvectors with fast select()."
-abstract type AbstractMappedBitVector <: AbstractVector{Bool} end
+abstract type AbstractBitVectorRSA <: AbstractVector{Bool} end
 
 
 #= Code =#
@@ -36,14 +36,18 @@ include("show.jl")
 # exports:
 export 
     # types:
-    RankedBitVector, 
+    BitVectorRA, 
     BitCache64,
     CachedBitVector,
-    MappedBitVector,
-    MappedBitVectorLayout,
-    SelectBitVector,
+    BitVectorRSA,
+    BitVectorSA,
     # methods:
     rank,
     select
 
 end # module GSAD
+
+# replace: 
+# BitVectorRA -> BitVectorRA
+# BitVectorRSA -> BitVectorRSA
+# BitVectorSA -> BitVectorSA

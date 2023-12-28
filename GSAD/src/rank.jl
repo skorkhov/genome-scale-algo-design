@@ -1,15 +1,15 @@
 
 """
-    RankedBitVector
+    BitVectorRA
 
 Data structure to support O(1)-time rank() queries on bit vectors.
 """
-struct RankedBitVector <: AbstractRankedBitVector
+struct BitVectorRA <: AbstractBitVectorRA
     bits::BitVector
     blocks::Vector{UInt32}
     chunks::Vector{UInt8}
 
-    function RankedBitVector(bits::BitVector) 
+    function BitVectorRA(bits::BitVector) 
         n = length(bits)
         n_chunks = cld(n, WIDTH_CHUNK)
         n_blocks = cld(n, WIDTH_BLOCK)
@@ -41,23 +41,23 @@ struct RankedBitVector <: AbstractRankedBitVector
     end
 end
 
-Base.length(x::AbstractRankedBitVector) = length(x.bits)
-Base.size(x::AbstractRankedBitVector) = (length(x),)
-Base.convert(::Type{BitVector}, x::AbstractRankedBitVector) = x.bits
-Base.convert(::Type{T}, x::BitVector) where T <: AbstractRankedBitVector = RankedBitVector(x)
+Base.length(x::AbstractBitVectorRA) = length(x.bits)
+Base.size(x::AbstractBitVectorRA) = (length(x),)
+Base.convert(::Type{BitVector}, x::AbstractBitVectorRA) = x.bits
+Base.convert(::Type{T}, x::BitVector) where T <: AbstractBitVectorRA = BitVectorRA(x)
 
-Base.getindex(A::AbstractRankedBitVector, i::Integer) = Base.getindex(A.bits, i)
-Base.firstindex(A::AbstractRankedBitVector) = firstindex(A.bits)
+Base.getindex(A::AbstractBitVectorRA, i::Integer) = Base.getindex(A.bits, i)
+Base.firstindex(A::AbstractBitVectorRA) = firstindex(A.bits)
 Base.lastindex(A) = lastindex(A.bits)
 
-Base.sum(v::AbstractRankedBitVector) = rank(v, length(v))
+Base.sum(v::AbstractBitVectorRA) = rank(v, length(v))
 
 """
-    rank(v::RankedBitVector, i::Integer)
+    rank(v::BitVectorRA, i::Integer)
 
 Compute the number of 1s in `v[1:i]` in O(1) time.
 """
-function rank(v::AbstractRankedBitVector, i::Integer)
+function rank(v::AbstractBitVectorRA, i::Integer)
     if i < 0 || length(v) < i
         throw(BoundsError(v, i))
     end
@@ -65,7 +65,7 @@ function rank(v::AbstractRankedBitVector, i::Integer)
     return rank_unsafe(v, i)
 end
 
-function rank_unsafe(v::AbstractRankedBitVector, i::Integer)
+function rank_unsafe(v::AbstractBitVectorRA, i::Integer)
     i_block = cld(i, WIDTH_BLOCK)
     i_chunk = cld(i, WIDTH_CHUNK)
     chunk = v.bits.chunks[i_chunk]
@@ -85,11 +85,11 @@ end
 
 
 """
-    select(v::AbstractRankedBitVector, j)
+    select(v::AbstractBitVectorRA, j)
 
 Compute index of a 1-element of `v` with rank `j` in O(log(len(v))) time. 
 """
-function select(v::AbstractRankedBitVector, j)
+function select(v::AbstractBitVectorRA, j)
     hi = length(v)
     lo = 1
     r_max = rank(v, hi)
