@@ -322,6 +322,17 @@ struct BitVectorRSA <: AbstractBitVectorRSA
 
 end
 
+BitVectorRSA(bits::T) where T <: AbstractVector = BitVectorRSA(convert(BitVector, bits))
+
+# Indexing: 
+Base.getindex(A::BitVectorRSA, i) = getindex(A.bits, i)
+Base.firstindex(A::BitVectorRSA) = firstindex(A.bits)
+Base.lastindex(A::BitVectorRSA) = lastindex(A.bits)
+
+# Iteration:
+Base.iterate(iter::BitVectorRSA) = iterate(iter.bits)
+Base.iterate(iter::BitVectorRSA, state) = iterate(iter.bits, state)
+
 Base.sum(v::BitVectorRSA) = v.population
 
 function select_unsafe(v::AbstractBitVectorRSA, j::Integer)
