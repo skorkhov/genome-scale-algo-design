@@ -31,6 +31,7 @@ include("bitutils.jl")
 include("rank.jl")
 include("bitcache.jl")
 include("select.jl")
+include("bst.jl")
 include("show.jl")
 
 # exports:
@@ -41,13 +42,9 @@ export
     CachedBitVector,
     BitVectorRSA,
     BitVectorSA,
+    VectorRMQ,
     # methods:
     rank,
-    select
-
+    select,
+    rmq
 end # module GSAD
-
-# replace: 
-# BitVectorRA -> BitVectorRA
-# BitVectorRSA -> BitVectorRSA
-# BitVectorSA -> BitVectorSA

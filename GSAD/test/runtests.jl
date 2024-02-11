@@ -9,4 +9,5 @@ using Random
 @testset "BitVectorRA" include("test-rank.jl")
 @testset "CachedBitVector" include("test-bitcache.jl")
 @testset "BitVectorSA" include("test-select.jl")
+@testset "Search Trees" include("test-bst.jl")
 
