@@ -15,25 +15,41 @@ mutable struct VectorRMQ{N, V}
 end
 
 function VectorRMQ(v::Vector{V}) where V
-    N = length(v)
-    A = VectorRMQ(V, N)
-    A.tree[N:end] .= v
+    n = length(v)
+    A = VectorRMQ(V, n)
+    
+    # shift vector elements to ensure complete tree; 
+    # get number of elements in the (incomplete) bottom-most layer: 
+    overflow = 2n - leaf(n, 1)
+    
+    # create new reordered array
+    vr = Vector{V}(undef, n)
+    vr[1:end - overflow] = last(v, n - overflow)
+    vr[end - overflow + 1:end] = first(v, overflow)
+    A.tree[n:end] .= vr
     
     # construct by traversing up through non-leafs
-    for i in N-1:-1:1
+    for i in n-1:-1:1
         A.tree[i] = min(A.tree[2i], A.tree[2i+1])
     end
 
     return A
 end
 
+function leaf(n::Integer, i::Integer)
+    nt = 2n - 1
+    offset = 1 << (sizeof(nt) * 8 - leading_zeros(nt) - 1) - 1
+    i = i + offset
+    return i > nt ? i - n : i
+end
+
 function Base.getindex(A::VectorRMQ{N}, i) where N
     1 <= i <= N || throw(BoundsError(A, i))
-    return A.tree[i + N - 1]
+    return A.tree[leaf(N, i)]
 end
 
 function Base.setindex!(A::VectorRMQ{N, V}, v::V, i) where {N, V}
-    i = i + N - 1
+    i = leaf(N, i)
     A.tree[i] = v
     while i > 1
         i = i >> 1
@@ -52,19 +68,20 @@ size(A::VectorRMQ{N}) where N = N isa Integer ? N : throw(MethodError(size, A))
 Compute index of the smallest value in sub-array A[i:j]
 """
 function rmq(A::VectorRMQ{N}, i::Integer, j::Integer) where N
-    l = i + N - 1
-    r = j + N - 1
+    l = leaf(N, i)
+    r = leaf(N, j)
     m = min(A.tree[l], A.tree[r])
 
     # compare initial depths of l and r; 
-    # it will either be the same or r will be deeper by one; 
-    # if the latter, advance r one level up: 
+    # it will either be the same or l (nor r!) will be deeper by one
+    # because the start of the array is at the deepest level;
+    # if the latter, advance l one level up: 
     if leading_zeros(l) != leading_zeros(r)
         # if r is a right child, min with left sibling:
-        if r % 2 == 1
-            m = min(m, A.tree[r - 1])
+        if l % 2 == 0
+            m = min(m, A.tree[l + 1])
         end
-        r = r >> 1
+        l = l >> 1
     end
 
     # proceed until l and r are sibling children of their lca
@@ -84,6 +101,31 @@ function rmq(A::VectorRMQ{N}, i::Integer, j::Integer) where N
     end
 
     return m
+end
+
+
+"""
+    TreeRMQ
+
+Data structure supporting O(log(n)) RMQs on key-value pairs of comparable items.
+"""
+mutable struct TreeRMQ{N, K, V}
+    tree::VectorRMQ{N, Tuple{K, V}}
+end
+
+function index_right_of(A::TreeRMQ{N, K}, i::K) where {N, K}
+
+end
+
+function index_left_of(A::TreeRMQ{N, K}, i::K) where {N, K}
+    
+end
+
+function rmq(A::TreeRMQ{N, K}, i::K, j::K) where {N, K}
+    l = index_left_of(A, i)
+    r = index_right_of(A, j)
+
+    return rmq(A.tree, l, r)
 end
 
 """
