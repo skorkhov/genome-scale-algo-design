@@ -6,11 +6,16 @@
 Vector of N elements of type V supporting O(log(n))-time and RMQ queries.
 """
 mutable struct VectorRMQ{N, V}
-    tree::Vector{V}
+    tree::Vector{Tuple{V, Int}}
+    ntree::Int
+    ntail::Int
 
     function VectorRMQ(::Type{V}, n::Integer) where V
-        tree = Vector{V}(undef, 2n - 1)
-        return new{n, V}(tree)
+        ntree = 2n - 1
+        ntail = 2n - (1 << (sizeof(ntree) * 8 - leading_zeros(ntree) - 1))
+        tree = Vector{Tuple{V, Int}}(undef, ntree)
+
+        return new{n, V}(tree, ntree, ntail)
     end
 end
 
@@ -18,14 +23,12 @@ function VectorRMQ(v::Vector{V}) where V
     n = length(v)
     A = VectorRMQ(V, n)
     
-    # shift vector elements to ensure complete tree; 
-    # get number of elements in the (incomplete) bottom-most layer: 
-    overflow = 2n - leaf(n, 1)
-    
     # create new reordered array
-    vr = Vector{V}(undef, n)
-    vr[1:end - overflow] = last(v, n - overflow)
-    vr[end - overflow + 1:end] = first(v, overflow)
+    vr = similar(A.tree, n)
+    vr[1:end - A.ntail] .= zip(last(v, n - A.ntail), A.ntail + 1:n)
+    vr[end - A.ntail + 1:end] .= zip(first(v, A.ntail), 1:A.ntail)
+    
+    # assign to tree:
     A.tree[n:end] .= vr
     
     # construct by traversing up through non-leafs
@@ -36,30 +39,27 @@ function VectorRMQ(v::Vector{V}) where V
     return A
 end
 
-function leaf(n::Integer, i::Integer)
-    nt = 2n - 1
-    offset = 1 << (sizeof(nt) * 8 - leading_zeros(nt) - 1) - 1
-    i = i + offset
-    return i > nt ? i - n : i
+function leaf(A::VectorRMQ{N}, i::Integer) where N
+    i = i + A.ntree - A.ntail
+    return i > A.ntree ? i - N : i
 end
 
 function Base.getindex(A::VectorRMQ{N}, i) where N
     1 <= i <= N || throw(BoundsError(A, i))
-    return A.tree[leaf(N, i)]
+    return A.tree[leaf(A, i)][1]
 end
 
 function Base.setindex!(A::VectorRMQ{N, V}, v::V, i) where {N, V}
-    i = leaf(N, i)
-    A.tree[i] = v
-    while i > 1
-        i = i >> 1
-        A.tree[i] = min(A.tree[2i], A.tree[2i + 1])
+    ileaf = leaf(A, i)
+    A.tree[ileaf] = (v, i)
+    while ileaf > 1
+        ileaf = ileaf >> 1
+        A.tree[ileaf] = min(A.tree[2ileaf], A.tree[2ileaf + 1])
     end
 end
 
 Base.firstindex(A::VectorRMQ{N}) where N = N
 Base.lastindex(A::VectorRMQ{N}) where N = 2N - 1
-
 size(A::VectorRMQ{N}) where N = N isa Integer ? N : throw(MethodError(size, A))
 
 """
@@ -68,8 +68,8 @@ size(A::VectorRMQ{N}) where N = N isa Integer ? N : throw(MethodError(size, A))
 Compute index of the smallest value in sub-array A[i:j]
 """
 function rmq(A::VectorRMQ{N}, i::Integer, j::Integer) where N
-    l = leaf(N, i)
-    r = leaf(N, j)
+    l = leaf(A, i)
+    r = leaf(A, j)
     m = min(A.tree[l], A.tree[r])
 
     # compare initial depths of l and r; 
@@ -103,6 +103,8 @@ function rmq(A::VectorRMQ{N}, i::Integer, j::Integer) where N
     return m
 end
 
+rmqv(A::VectorRMQ{N}, i::Integer, j::Integer) where N = rmq(A, i, j)[1]
+rmqi(A::VectorRMQ{N}, i::Integer, j::Integer) where N = rmq(A, i, j)[2]
 
 """
     TreeRMQ
