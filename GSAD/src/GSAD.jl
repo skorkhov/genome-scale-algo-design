@@ -42,7 +42,7 @@ export
     CachedBitVector,
     BitVectorRSA,
     BitVectorSA,
-    VectorRMQ,
+    VectorRMQ, TreeRMQ,
     # methods:
     rank,
     select,

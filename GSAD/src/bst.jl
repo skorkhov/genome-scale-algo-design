@@ -58,8 +58,8 @@ function Base.setindex!(A::VectorRMQ{N, V}, v::V, i) where {N, V}
     end
 end
 
-Base.firstindex(A::VectorRMQ{N}) where N = N
-Base.lastindex(A::VectorRMQ{N}) where N = 2N - 1
+Base.firstindex(A::VectorRMQ{N}) where N = 1
+Base.lastindex(A::VectorRMQ{N}) where N = N
 size(A::VectorRMQ{N}) where N = N isa Integer ? N : throw(MethodError(size, A))
 
 """
@@ -103,50 +103,52 @@ function rmq(A::VectorRMQ{N}, i::Integer, j::Integer) where N
     return m
 end
 
-rmqv(A::VectorRMQ{N}, i::Integer, j::Integer) where N = rmq(A, i, j)[1]
-rmqi(A::VectorRMQ{N}, i::Integer, j::Integer) where N = rmq(A, i, j)[2]
-
 """
     TreeRMQ
 
 Data structure supporting O(log(n)) RMQs on key-value pairs of comparable items.
 """
 mutable struct TreeRMQ{N, K, V}
-    tree::VectorRMQ{N, Tuple{K, V}}
+    tree::VectorRMQ{N, V}
+    keys::Vector{K}
 end
 
-function index_right_of(A::TreeRMQ{N, K}, i::K) where {N, K}
-
-end
-
-function index_left_of(A::TreeRMQ{N, K}, i::K) where {N, K}
+function TreeRMQ(v::Vector{Tuple{K, V}}) where {K, V}
+    n = length(v)
+    vs = sort(v)
+    keys = [item[1] for item in vs]
+    values = [item[2] for item in vs]
+    tree = VectorRMQ(values)
     
+    return TreeRMQ{n, K, V}(tree, keys)
 end
 
-function rmq(A::TreeRMQ{N, K}, i::K, j::K) where {N, K}
-    l = index_left_of(A, i)
-    r = index_right_of(A, j)
+# TODO: convert keys and vals to iterator
+Base.keys(A::TreeRMQ) = A.keys
+Base.values(A::TreeRMQ{N}) where N = [A.tree[i] for i in 1:N]
 
-    return rmq(A.tree, l, r)
+function Base.getindex(A::TreeRMQ{N, K, V}, i::K) where {N, K, V}
+    idx = findfirst(x -> x == i, A.keys)
+    idx === nothing && throw(KeyError(i))
+    return A.tree[idx]
 end
 
-"""
-    StaticTreeRMQ
-
-Segment tree for O(log(n)) Range Min Queries.
-"""
-struct StaticTreeRMQ{N <: Integer, K, V}
-    tree::Vector{K}    # implicit tree of keys
-    values::Vector{V}  # vector ov values corresponding to keys in tree
+function Base.setindex!(A::TreeRMQ{N, K, V}, v::V, i::K) where {N, K, V}
+    idx = findfirst(x -> x == i, A.keys)
+    idx === nothing && throw(KeyError(i))
+    A.tree[idx] = v
 end
 
-function StaticTreeRMQ(keys::K, vals::V) where {K, V}
-    N = length(keys)
+function rmq(A::TreeRMQ{N, K, V}, i::K, j::K) where {N, K, V}
+    i <= j || throw(BoundsError(A, (i, j)))
+    l = findfirst(x -> x >= i, A.keys)
+    r = findlast(x -> x <= j, A.keys)
+    (l === nothing || r === nothing) && throw(BoundsError(A, (i, j)))
     
-    tree = Vector{K}(undef, 2 * N - 1)
-    tree[N:end] = keys
-    values = Vector{V}(undef, 2 * N - 1)
-    values[N:end] = vals
+    v, idx = rmq(A.tree, l, r)
 
-    StaticTreeRMQ{N, K, V}(tree, values) 
+    return (v, A.keys[idx])
 end
+
+rmqv(A, i, j) = rmq(A, i, j)[1]
+rmqi(A, i, j) = rmq(A, i, j)[2]
