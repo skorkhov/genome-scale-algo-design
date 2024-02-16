@@ -32,6 +32,7 @@ include("rank.jl")
 include("bitcache.jl")
 include("select.jl")
 include("bst.jl")
+include("editdist.jl")
 include("show.jl")
 
 # exports:

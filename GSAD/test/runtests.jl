@@ -10,4 +10,5 @@ using Random
 @testset "CachedBitVector" include("test-bitcache.jl")
 @testset "BitVectorSA" include("test-select.jl")
 @testset "Search Trees" include("test-bst.jl")
+@testset "Edit Distance" include("test-editdist.jl")
 
