@@ -68,8 +68,10 @@ size(A::VectorRMQ{N}) where N = N isa Integer ? N : throw(MethodError(size, A))
 Compute index of the smallest value in sub-array A[i:j]
 """
 function rmq(A::VectorRMQ{N}, i::Integer, j::Integer) where N
+    1 <= i <= j <= N || throw(DomainError((i, j), "range $i:$j lies outside the range 1:$N covered by indexes of A"))
     l = leaf(A, i)
     r = leaf(A, j)
+    l == r && return A.tree[l]
     m = min(A.tree[l], A.tree[r])
 
     # compare initial depths of l and r; 

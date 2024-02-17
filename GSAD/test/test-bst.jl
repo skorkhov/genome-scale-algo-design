@@ -7,6 +7,11 @@ A = VectorRMQ(v)
 @test rmq(A, 2, 3) == (2, 2)
 @test rmq(A, 5, 10) == (5, 5)
 @test rmq(A, 7, 10) == (7, 7)
+# i == j: 
+@test rmq(A, 7, 7) == (7, 7)
+# indexes outside the range:
+@test_throws DomainError rmq(A, 0, 3)
+@test_throws DomainError rmq(A, 1, 11)
 
 A[1] = -1
 @test A[1] == -1

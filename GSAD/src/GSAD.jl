@@ -47,5 +47,6 @@ export
     # methods:
     rank,
     select,
-    rmq, rmqi, rmqv
+    rmq, rmqi, rmqv, 
+    equalpairs, editdist
 end # module GSAD
