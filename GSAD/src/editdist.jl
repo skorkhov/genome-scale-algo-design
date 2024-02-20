@@ -43,15 +43,20 @@ function equalpairs(x::String, y::String)
     return pairs[begin:acc]
 end
 
+"""
+    editdist(x::String, y::String)
+
+Compute indel edit distance between x and y.
+"""
 function editdist(x::String, y::String)
     m, n = length(x), length(y)
     M = equalpairs(x, y)
-    T = VectorRMQ(fill(0, m + 1))
+    T = VectorRMQ(fill(typemax(Int), m + 1))
     T[1] = 0
-    for (i, j) in M
-        dij = i + j - 2 + rmqv(T, 1, i)
-        d = dij - i - j
-        T[i + 1] = d
+    for (i, _) in M
+        # dij = i + j - 2 + rmqv(T, 1, i)
+        # d = dij - i - j
+        T[i + 1] = rmqv(T, 1, i) - 2
     end
 
     return rmqv(T, 1, m + 1) + m + n

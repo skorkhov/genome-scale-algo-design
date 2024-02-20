@@ -1,7 +1,6 @@
 using Test
 using GSAD
 
-# TODO: fix test to use order, not just set
 x = "qwer"
 y = "...rewq---"
 matches = [
