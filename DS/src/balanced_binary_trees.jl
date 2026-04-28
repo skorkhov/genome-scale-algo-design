@@ -1,25 +1,26 @@
 
 mutable struct RBTreeNode{T} <: AbstractNode
     color::Bool  # true=red
-    left::Union{RBTreeNode{T}, Nothing}
-    right::Union{RBTreeNode{T}, Nothing}
+    left::Union{RBTreeNode{T},Nothing}
+    right::Union{RBTreeNode{T},Nothing}
     key::T
-    value
+    value::Any
 
-    RBTreeNode{T}(key, value) where T = new(false, nothing, nothing, key, value)
-    RBTreeNode{T}(color, left, right, key, value) where T = new(color, left, right, key, value)
+    RBTreeNode{T}(key, value) where {T} = new(false, nothing, nothing, key, value)
+    RBTreeNode{T}(color, left, right, key, value) where {T} =
+        new(color, left, right, key, value)
 end
 
-RBTreeNode(key::T, value) where T = RBTreeNode{T}(key, value)
+RBTreeNode(key::T, value) where {T} = RBTreeNode{T}(key, value)
 
 # tree struct, allows to pop the root from the tree
 mutable struct RBTree{T} <: AbstractTree
-    root::Union{RBTreeNode{T}, Nothing}
+    root::Union{RBTreeNode{T},Nothing}
 end
 
 
 # true of valid, else false
-function valid_rbtree_node(node::RBTreeNode{T}) where T
+function valid_rbtree_node(node::RBTreeNode{T}) where {T}
     (node === nothing || node.left === nothing || node.right === nothing) && return true
     isred(node.right) && return false
     isred(node) && isred(node.left) && return false
@@ -27,9 +28,9 @@ function valid_rbtree_node(node::RBTreeNode{T}) where T
     true
 end
 
-function valid_rbtree(node::RBTreeNode{T}) where T
+function valid_rbtree(node::RBTreeNode{T}) where {T}
     isred(node) && flip!(node)
-    queue = Union{Nothing, RBTreeNode{T}}[node]
+    queue = Union{Nothing,RBTreeNode{T}}[node]
     while length(queue) != 0
         # check current node
         node = pop!(queue)
@@ -42,32 +43,38 @@ function valid_rbtree(node::RBTreeNode{T}) where T
     true
 end
 
-function compute_black_height(node::RBTreeNode{T}) where T
-    parents = Dict{T, T}()
-    black_count = Dict{T, Int}()
-    terminal_node = Dict{T, Bool}()
+function compute_black_height(node::RBTreeNode{T}) where {T}
+    parents = Dict{T,T}()
+    black_count = Dict{T,Int}()
+    terminal_node = Dict{T,Bool}()
 
     # traverse the tree:
-    queue = Union{Nothing, RBTreeNode{T}}[node]
+    queue = Union{Nothing,RBTreeNode{T}}[node]
     while length(queue) != 0
         node = pop!(queue)
-        if node === nothing continue end 
+        if node === nothing
+            continue
+        end
         push!(queue, node.right, node.left)
 
         # add to terminal node: 
-        if node.left === nothing || node.right === nothing 
+        if node.left === nothing || node.right === nothing
             terminal_node[node.key] = true
-        else 
+        else
             terminal_node[node.key] = false
         end
 
         # increment counter: 
         node_parent = get(parents, node.key, -99)
         black_count[node.key] = get(black_count, node_parent, 0) + !isred(node)
-        
+
         # add child => parent to parent: 
-        if node.left !== nothing parents[node.left.key] = node.key end
-        if node.right !== nothing parents[node.right.key] = node.key end
+        if node.left !== nothing
+            parents[node.left.key] = node.key
+        end
+        if node.right !== nothing
+            parents[node.right.key] = node.key
+        end
     end
 
     terminal = [k for (k, v) in terminal_node if v]
@@ -78,18 +85,20 @@ end
 # DONE: get()
 # DONE: recursive push!()
 
-function getnode(node::RBTreeNode{T}, key::T) where T
+function getnode(node::RBTreeNode{T}, key::T) where {T}
     while node !== nothing && key != node.key
         node = key < node.key ? node.left : node.right
     end
-    
+
     node
 end
 
-get(node::RBTreeNode{T}, key::T) where T = (node = getnode(node, key)) === nothing ? nothing : node.value
+get(node::RBTreeNode{T}, key::T) where {T} =
+    (node = getnode(node, key)) === nothing ? nothing : node.value
 
-isred(node::Union{RBTreeNode, Nothing}) = node === nothing ? false : node.color
-flip!(node::Union{RBTreeNode, Nothing}) = node !== nothing ? node.color = !node.color : nothing
+isred(node::Union{RBTreeNode,Nothing}) = node === nothing ? false : node.color
+flip!(node::Union{RBTreeNode,Nothing}) =
+    node !== nothing ? node.color = !node.color : nothing
 
 function fliplinks!(node::RBTreeNode)
     flip!(node)
@@ -98,9 +107,9 @@ function fliplinks!(node::RBTreeNode)
     node
 end
 
-function rotate_left!(node::RBTreeNode) 
+function rotate_left!(node::RBTreeNode)
     node.right === nothing && return node
-    
+
     out = node.right
     node.right = node.right.left
     out.left = node
@@ -113,7 +122,7 @@ end
 function rotate_right!(node::RBTreeNode)
     node.left === nothing && return node
 
-    out = node.left 
+    out = node.left
     node.left = node.left.right
     out.right = node
 
@@ -123,18 +132,18 @@ function rotate_right!(node::RBTreeNode)
     return out
 end
 
-function pushr!(node::Union{RBTreeNode{T}, Nothing}, key::T, value) where T
+function pushr!(node::Union{RBTreeNode{T},Nothing}, key::T, value) where {T}
     if node === nothing
         out = RBTreeNode{T}(key, value)
         out.color = true
         return out
     end
 
-    if key < node.key 
+    if key < node.key
         node.left = pushr!(node.left, key, value)
     elseif key > node.key
         node.right = pushr!(node.right, key, value)
-    else 
+    else
         node.value = value
         return node
     end
@@ -163,7 +172,7 @@ function find_min(node::RBTreeNode)
 end
 
 # descend down the left node making sure the current node is never a 3 node
-function popmin!(node::RBTreeNode{T}) where T
+function popmin!(node::RBTreeNode{T}) where {T}
     node.left === nothing && return nothing
 
     # if node == "red" -- at left end of 3 or 4-node:
@@ -174,7 +183,7 @@ function popmin!(node::RBTreeNode{T}) where T
     #       advance            
     # if node == "black":
     #   if should_balance == TRUE -- can only happen at the root
-        #   same procedures
+    #   same procedures
     #   if should_balance == FALSE
     #       advance
 
@@ -184,9 +193,11 @@ function popmin!(node::RBTreeNode{T}) where T
     if !isred(node.left) && !isred(node.left.left)
         # either at root, or at left end of 3- or 4-node
         # and next node 
-        if node.right === nothing throw(ErrorException("invalid node: $(node.key)")) end
+        if node.right === nothing
+            throw(ErrorException("invalid node: $(node.key)"))
+        end
         # TODO: check if nothing condition is needed
-        if node.right === nothing || !isred(node.right.left) 
+        if node.right === nothing || !isred(node.right.left)
             fliplinks!(node)
         else
             node.right = rotate_right!(node.right)
@@ -208,7 +219,7 @@ end
 function increase_node_order!(node::RBTreeNode)
     # either at root, or at left end of 3- or 4-node 
     # TODO: check if nothing condition is needed
-    if node.right === nothing || !isred(node.right.left) 
+    if node.right === nothing || !isred(node.right.left)
         fliplinks!(node)
     else
         node.right = rotate_right!(node.right)
@@ -229,7 +240,7 @@ function balance!(node::RBTreeNode)
     node
 end
 
-function pop!(node::RBTreeNode{T}, key::T) where T
+function pop!(node::RBTreeNode{T}, key::T) where {T}
     get(node, key) === nothing && return node
     node === nothing && return nothing
 
@@ -237,7 +248,7 @@ function pop!(node::RBTreeNode{T}, key::T) where T
     if !isred(node.left) && !isred(node.left.left)
         # either at root, or at left end of 3- or 4-node 
         # TODO: check if nothing condition is needed
-        if node.right === nothing || !isred(node.right.left) 
+        if node.right === nothing || !isred(node.right.left)
             fliplinks!(node)
         else
             node.right = rotate_right!(node.right)
@@ -248,7 +259,7 @@ function pop!(node::RBTreeNode{T}, key::T) where T
     end
 
     # recurse
-    if key < node.key 
+    if key < node.key
         node.left = pop!(node.left, key)
     elseif key > node.key
         node.right = pop!(node.right, key)

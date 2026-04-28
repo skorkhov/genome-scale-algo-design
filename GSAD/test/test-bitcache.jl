@@ -2,16 +2,16 @@ using Test
 using Random
 using GSAD
 
-include("TestUtils.jl")
+include("TestUtils.jl")#= test constructor and type utils =#
 
 
-#= test constructor and type utils =#
+
 
 Base.copy(x::GSAD.BitCache64) = GSAD.BitCache64(x.cache)
 
 @testset "BitCache64" begin
     empty = GSAD.BitCache64(0)
-    
+
     cache = copy(empty)
     GSAD.offset_cache!(cache, 0b11)
     @test cache.cache == UInt64(2^24 + 2^25)
@@ -32,7 +32,7 @@ Base.copy(x::GSAD.BitCache64) = GSAD.BitCache64(x.cache)
     GSAD.push_cache!(cache, 3, bits)
     val = val + UInt64(bits)
     @test cache.cache == val
-    
+
     bits = 0b10100
     GSAD.push_cache!(cache, 2, bits)
     val = val + UInt64(bits) << 8
@@ -47,7 +47,7 @@ end
 @testset "CachedBitVector" begin
     bitvector = BitVector([1, 0, 0])
     v = CachedBitVector(bitvector)
-    
+
     @test v.bits == bitvector
     @test length(v.cache) == 1
     @test v.cache[1].cache == GSAD.BitCache64().cache
@@ -65,12 +65,13 @@ end
     @test length(v.cache) == 2
     @test v.cache[1].cache == c1.cache
     @test v.cache[2].cache == c2.cache
-end
+end#= test rank() and select() =#
 
 
-#= test rank() and select() =#
+
 
 @testset "rank(::CachedBitVector, ...)" TestUtils.test_rank(CachedBitVector)
-@testset "rank(::CachedBitVector, ...) mem-intensive" TestUtils.test_rank_memlimit(CachedBitVector)
+@testset "rank(::CachedBitVector, ...) mem-intensive" TestUtils.test_rank_memlimit(
+    CachedBitVector,
+)
 # @testset "select(::BitVectorRA, ...)" test_select(BitVectorRA)
-

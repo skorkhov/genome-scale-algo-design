@@ -10,7 +10,7 @@ mutable struct WEdge <: AbstractEdge
 end
 
 
-function empty_adjlist(n) 
+function empty_adjlist(n)
     adjlist = Vector{Vector{WEdge}}(undef, n)
     for i in eachindex(adjlist)
         adjlist[i] = Vector{WEdge}[]
@@ -32,11 +32,11 @@ end
 
 # digraph creation and modification: 
 
-function add_edge!(G::WDiGraph, edge::Tuple{Int, Int, <:Real})
+function add_edge!(G::WDiGraph, edge::Tuple{Int,Int,<:Real})
     to_add = WEdge(edge...)
     nE = G.nE
     to_add in G.edges[1:nE] && return nothing
-    
+
     # not in graph yet:
     src = to_add.src
     # update graph obj:
@@ -74,10 +74,10 @@ end
 
 function relax_edge!(distTo, edgeTo, G::WDiGraph, edge_idx::Int)
     edge = G.edges[edge_idx]
-    
+
     # if path to source hasn't been build, the edge cannot be relaxed yet: 
     distTo[edge.src] == -999 && return nothing
-    
+
     print("relaxing $edge_idx: $edge\n")
     # if distTo[dst] not defined, edge will be relaxed: 
     distTo_candidate = edge.w + distTo[edge.src]
@@ -95,9 +95,9 @@ function belleman_ford(G::WDiGraph, s::Int)
     distTo[s] = 0
     edgeTo = fill(-999, G.nV)
 
-    for iter in 1:G.nV
+    for iter = 1:G.nV
         print("Iteration $iter / $(G.nV)\n")
-        for edge_idx in 1:G.nE
+        for edge_idx = 1:G.nE
             relax_edge!(distTo, edgeTo, G, edge_idx)
         end
     end
@@ -127,7 +127,7 @@ function graph_as_matrix(G::WDiGraph)
     mtx = fill(0, (G.nV, G.nV))
     for edge in G.edges
         mtx[edge.src, edge.dst] = 1
-    end 
+    end
 
     mtx
 end

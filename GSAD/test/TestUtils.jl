@@ -4,18 +4,18 @@ using Test
 using Random
 using GSAD
 
-function make_bitvec_small(::Type{T}) where T
+function make_bitvec_small(::Type{T}) where {T}
     bitvector = BitVector([1, 1, 1, 0, 0, 1, 0, 0])
     T(bitvector)
 end
 
-function make_bitvec_medium(::Type{T}) where T
+function make_bitvec_medium(::Type{T}) where {T}
     Random.seed!(1)
     bitvector = bitrand(257)
     T(bitvector)
 end
 
-function make_bitvec_5chunk(::Type{T}) where T
+function make_bitvec_5chunk(::Type{T}) where {T}
     # bitvector long enough to grab all chunks: 
     s1 = [BitVector([1, 1, 0, 1, 1, 0]); falses(58)]
     s2 = [BitVector([0, 0, 1]); falses(61)]
@@ -24,23 +24,23 @@ function make_bitvec_5chunk(::Type{T}) where T
     T(bitvector)
 end
 
-function make_bitvec_memlimit(::Type{T}) where T
+function make_bitvec_memlimit(::Type{T}) where {T}
     len = 2^32 + 3
     bitvector = trues(len)
     T(bitvector)
 end
 
-function make_bitrand(::Type{T}, n::Integer) where T
+function make_bitrand(::Type{T}, n::Integer) where {T}
     Random.seed!(1)
     bitvector = bitrand(n)
     T(bitvector)
-end
+end#= test rank() and select() operation on indexed vectors =#
 
 
 
-#= test rank() and select() operation on indexed vectors =#
 
-function test_rank(::Type{T}) where T
+
+function test_rank(::Type{T}) where {T}
     # short vector with one chunk: 
     v = make_bitvec_small(T)
     @test rank(v, 2) == 2
@@ -82,13 +82,13 @@ Test rank operation on long bitvectors.
 For bitvectors beyond len=2^32, both long and short cache slots have to be used 
 to store long cache val. Test handling of such vals via this fucntion.
 """
-function test_rank_memlimit(::Type{T}) where T
+function test_rank_memlimit(::Type{T}) where {T}
     v = make_bitvec_memlimit(T)
     @test rank(v, 1000) == UInt64(1000)
     @test rank(v, 2^32 + 1) == UInt64(2^32 + 1)
 end
 
-function test_select(::Type{T}) where T
+function test_select(::Type{T}) where {T}
     v = make_bitvec_small(T)
     @test select(v, 4) == 6
     # catching edge cases at low counts: 
@@ -102,7 +102,7 @@ function test_select(::Type{T}) where T
     @test select(v, 5) == 67
 end
 
-function test_select_memlimit(::Type{T}) where T
+function test_select_memlimit(::Type{T}) where {T}
     nothing
 end
 

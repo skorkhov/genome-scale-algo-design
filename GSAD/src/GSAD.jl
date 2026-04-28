@@ -1,6 +1,12 @@
 module GSAD
 
+
+
+# rank() constants:
 #= Const =#
+
+
+
 
 # rank() constants:
 const WIDTH_BLOCK::Int = 256
@@ -12,18 +18,18 @@ const SEG_DENSE_MAXWIDTH::Int = 64^4
 const SEG_POPULATION::Int = 64^2
 const SUBSEG_DENSE_MAXWIDTH::Int = 64 / 2
 const SUBSEG_POPULATION::Int = 8
-const N_SUBSEG_PER_SEG::Int = SEG_POPULATION / SUBSEG_POPULATION
+const N_SUBSEG_PER_SEG::Int = SEG_POPULATION / SUBSEG_POPULATION#= Types =#
 
-#= Types =# 
+
 
 "Supertype for one-dimensional bitvectors with fast rank()."
 abstract type AbstractBitVectorRA <: AbstractVector{Bool} end
 
 "Supertype for one-dimensional bitvectors with fast select()."
-abstract type AbstractBitVectorRSA <: AbstractVector{Bool} end
+abstract type AbstractBitVectorRSA <: AbstractVector{Bool} end#= Code =#
 
 
-#= Code =#
+
 
 include("intro.jl")
 include("reference.jl")
@@ -36,17 +42,21 @@ include("editdist.jl")
 include("show.jl")
 
 # exports:
-export 
+export
     # types:
-    BitVectorRA, 
+    BitVectorRA,
     BitCache64,
     CachedBitVector,
     BitVectorRSA,
     BitVectorSA,
-    VectorRMQ, TreeRMQ,
+    VectorRMQ,
+    TreeRMQ,
     # methods:
     rank,
     select,
-    rmq, rmqi, rmqv, 
-    equalpairs, editdist
+    rmq,
+    rmqi,
+    rmqv,
+    equalpairs,
+    editdist
 end # module GSAD

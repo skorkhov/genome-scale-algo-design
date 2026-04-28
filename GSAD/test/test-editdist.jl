@@ -3,24 +3,19 @@ using GSAD
 
 x = "qwer"
 y = "...rewq---"
-matches = [
-    (4, 4),
-    (3, 5),
-    (2, 6),
-    (1, 7)
-]
+matches = [(4, 4), (3, 5), (2, 6), (1, 7)]
 @test equalpairs(x, y) == matches
 
 x = "tervetuloa"
 y = "teretulemast"
 matches = [
     (6, 1),
-    (1, 1), 
+    (1, 1),
     (5, 2),
-    (2, 2), 
+    (2, 2),
     (3, 3),
     (5, 4),
-    (2, 4), 
+    (2, 4),
     (6, 5),
     (1, 5),
     (7, 6),
@@ -29,7 +24,7 @@ matches = [
     (2, 8),
     (10, 10),
     (6, 12),
-    (1, 12)
+    (1, 12),
 ]
 @test equalpairs(x, y) == matches
 @test editdist(x, y) == 6

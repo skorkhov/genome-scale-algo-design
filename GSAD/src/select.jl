@@ -26,9 +26,9 @@ function index_in_layout(j)
     iseg, jj = index_in_interval(j, SEG_POPULATION)
     isubseg, jj = index_in_interval(jj, SUBSEG_POPULATION)
     return iseg, isubseg, jj
-end
+end#= BitVectorSA =#
 
-#= BitVectorSA =#
+
 
 # Implementation inspired by the idea of storing interval offsets and position 
 # caches in ragged arrays (wrapped in resp types for Sparse, Dense-sparce, and 
@@ -45,7 +45,7 @@ end
 
 Base.getindex(A::SubSegmentSparse, jj) = A.cache[jj]
 
-SubSegment = Union{SubSegmentDense, SubSegmentSparse}
+SubSegment = Union{SubSegmentDense,SubSegmentSparse}
 
 struct SegmentDense
     start::UInt64
@@ -62,7 +62,7 @@ end
 Base.getindex(A::SegmentSparse, jj) = A.cache[jj]
 Base.getindex(A::SegmentSparse, isubseg, jj) = Base.getindex(A, (isubseg - 1) * 8 + jj)
 
-Segment = Union{SegmentSparse, SegmentDense}
+Segment = Union{SegmentSparse,SegmentDense}
 
 struct BitVectorSA <: AbstractBitVectorRSA
     bits::BitVector
@@ -70,11 +70,11 @@ struct BitVectorSA <: AbstractBitVectorRSA
     # offset caches:
     intervals::Vector{Segment}
 
-    function BitVectorSA(bits::T) where T <: AbstractVector{Bool}
+    function BitVectorSA(bits::T) where {T<:AbstractVector{Bool}}
         pop = sum(bits)
         intervals = Vector{Segment}(undef, cld(pop, 4096))
-    
-        pos = findall(bits) 
+
+        pos = findall(bits)
         segs = partition(pos, 4096)
         for iseg in eachindex(segs)
             seg = segs[iseg]
@@ -96,12 +96,12 @@ struct BitVectorSA <: AbstractBitVectorRSA
                         subsegments[isubseg] = SubSegmentDense(offset)
                     end
                 end
-    
+
                 intervals[iseg] = SegmentDense(segstart, subsegments)
-    
+
             end
         end
-    
+
         new(bits, pop, intervals)
     end
 end
@@ -125,7 +125,7 @@ function select_unsafe(v::BitVectorSA, j::Integer)
     # if j in Dense-dense sub-segment,
     # run a short loop to access it's position: 
     pos = segment.start + subsegment.offset - 1
-    for _ in 1:jj
+    for _ = 1:jj
         pos = findnext(v.bits, pos + 1)
     end
     return pos
@@ -138,12 +138,12 @@ Partitiion vector `v` into into vectors of len `n` plus tail `len(tail) < n`.
 """
 function partition(v::Vector, n::Integer)
     l = length(v)
-    idxs = [LinearIndices(v)[f:min(l, f + n - 1)] for f in 1:n:l]
+    idxs = [LinearIndices(v)[f:min(l, f+n-1)] for f = 1:n:l]
     return [v[i] for i in idxs]
-end
+end#= LayoutIntRank =#
 
 
-#= LayoutIntRank =#
+
 
 struct SegmentIntRank
     start::UInt32
@@ -162,18 +162,18 @@ struct LayoutIntRank
     subsegments::Vector{SubsegmentIntRank}
 end
 
-function LayoutIntRank(bits::T) where T <: AbstractVector{Bool}
+function LayoutIntRank(bits::T) where {T<:AbstractVector{Bool}}
     pos = findall(bits)
     pop = length(pos)
 
     nseg = cld(pop, SEG_POPULATION)
     segments = Vector{SegmentIntRank}(undef, nseg)
     segrank = 0
-    for iseg in 1:nseg
+    for iseg = 1:nseg
         from = (iseg - 1) * SEG_POPULATION + 1
         to = min(from + SEG_POPULATION - 1, pop)
-        if (to - from < SEG_POPULATION - 1) || 
-            (pos[to] - pos[from] >= SEG_DENSE_MAXWIDTH - 1)
+        if (to - from < SEG_POPULATION - 1) ||
+           (pos[to] - pos[from] >= SEG_DENSE_MAXWIDTH - 1)
             # sparse segment:
             segments[iseg] = SegmentIntRank(pos[from], segrank, false)
         else
@@ -186,15 +186,15 @@ function LayoutIntRank(bits::T) where T <: AbstractVector{Bool}
     nsubseg = segrank * N_SUBSEG_PER_SEG
     subsegments = Vector{SubsegmentIntRank}(undef, nsubseg)
     subsegrank = 0
-    for iseg in 1:nseg
+    for iseg = 1:nseg
         if segments[iseg].dense
             segstart = segments[iseg].start
             n_in_prev_sparse_seg = (iseg - segments[iseg].rank) * SEG_POPULATION
-            
+
             # subseg indexes to assign:
             from_subseg = (segments[iseg].rank - 1) * N_SUBSEG_PER_SEG + 1
             to_subseg = min(from_subseg + N_SUBSEG_PER_SEG - 1, nsubseg)
-            for isubseg in from_subseg:to_subseg
+            for isubseg = from_subseg:to_subseg
                 # select position array indexes to consider: 
                 from = n_in_prev_sparse_seg + (isubseg - 1) * SUBSEG_POPULATION + 1
                 to = min(from + SUBSEG_POPULATION - 1, pop)
@@ -202,7 +202,7 @@ function LayoutIntRank(bits::T) where T <: AbstractVector{Bool}
                 if pos[to] - pos[from] >= SUBSEG_DENSE_MAXWIDTH - 1
                     # D-sparse sub-segment:
                     subsegments[isubseg] = SubsegmentIntRank(offset, subsegrank, false)
-                else 
+                else
                     # D-dense sub-segment:
                     subsegrank += 1
                     subsegments[isubseg] = SubsegmentIntRank(offset, subsegrank, true)
@@ -212,10 +212,10 @@ function LayoutIntRank(bits::T) where T <: AbstractVector{Bool}
     end
 
     LayoutIntRank(segments, subsegments)
-end
+end#= BitVectorRSA =#
 
 
-#= BitVectorRSA =#
+
 
 # TODO: implement type stability for select(::BitVectorRSA)
 # TODO: support rank on BitVectorRSA; rename BitVectorRSA
@@ -235,15 +235,15 @@ struct BitVectorRSA <: AbstractBitVectorRSA
     is_dense::BitVectorRA
     subsegoffset::Vector{UInt32}
     is_ddense::BitVectorRA
-    
+
     # cache tables:
     Ss::Matrix{UInt32}  # SEG_POPULATION x [nsegsparse]
     Ds::Matrix{UInt32}  # SUBSEG_POPULATION x [nsubsegsparse]
 
-    function BitVectorRSA(bits::T) where T <: AbstractVector{Bool}
+    function BitVectorRSA(bits::T) where {T<:AbstractVector{Bool}}
         pos = findall(bits)
         pop = length(pos)
-        
+
         # Segment data
         # layout: 
         nseg = cld(pop, SEG_POPULATION)
@@ -253,11 +253,11 @@ struct BitVectorRSA <: AbstractBitVectorRSA
         Ss = Matrix{UInt32}(undef, (SEG_POPULATION, nseg))
 
         segrank = 0
-        for iseg in 1:nseg
+        for iseg = 1:nseg
             from = (iseg - 1) * SEG_POPULATION + 1
             to = min(from + SEG_POPULATION - 1, pop)
             segstart[iseg] = pos[from]
-    
+
             # segment is Sparse when either:
             # - it has fewer 1-bits than SEG_POPULATION; or
             # - it is longer than/equal to the SEG_DENSE_MAXWIDTH threshold
@@ -265,14 +265,14 @@ struct BitVectorRSA <: AbstractBitVectorRSA
             if is_shorter_than_cutoff || (to - from + 1 < SEG_POPULATION)
                 # sparse segment:
                 is_dense[iseg] = false
-                @views Ss[1:(to - from + 1), iseg - segrank] = pos[from:to] .- pos[from]
+                @views Ss[1:(to-from+1), iseg-segrank] = pos[from:to] .- pos[from]
             else
                 # dense segment:
                 is_dense[iseg] = true
                 segrank += 1
             end
         end
-    
+
         # Sub-segment data
         # layout:
         nsubseg = segrank * N_SUBSEG_PER_SEG
@@ -280,21 +280,21 @@ struct BitVectorRSA <: AbstractBitVectorRSA
         is_ddense = falses(nsubseg)
         # cache:
         Ds = Matrix{UInt32}(undef, (SUBSEG_POPULATION, nsubseg))
-    
+
         segrank = 0
         subsegrank = 0
-        for iseg in 1:nseg
+        for iseg = 1:nseg
             if is_dense[iseg]
                 segrank += 1
                 isegstart = segstart[iseg]
-                
+
                 n_from_sparse = (iseg - segrank) * SEG_POPULATION
-                
+
                 # subseg indexes to consider for the given (dense) segment: 
                 from_subseg = (segrank - 1) * N_SUBSEG_PER_SEG + 1
                 to_subseg = segrank * N_SUBSEG_PER_SEG
-    
-                for isubseg in from_subseg:to_subseg
+
+                for isubseg = from_subseg:to_subseg
                     # consider the following position array indexes:
                     from = n_from_sparse + (isubseg - 1) * SUBSEG_POPULATION + 1
                     to = from + SUBSEG_POPULATION - 1
@@ -302,8 +302,9 @@ struct BitVectorRSA <: AbstractBitVectorRSA
                     if pos[to] - pos[from] + 1 >= SUBSEG_DENSE_MAXWIDTH
                         # D-sparse sub-segment:
                         is_ddense[isubseg] = false
-                        @views Ds[1:SUBSEG_POPULATION, isubseg - subsegrank] = pos[from:to] .- pos[from]
-                    else 
+                        @views Ds[1:SUBSEG_POPULATION, isubseg-subsegrank] =
+                            pos[from:to] .- pos[from]
+                    else
                         # D-dense sub-segment:
                         is_ddense[isubseg] = true
                         subsegrank += 1
@@ -313,16 +314,20 @@ struct BitVectorRSA <: AbstractBitVectorRSA
         end
 
         new(
-            bits, pop,
-            segstart, is_dense, subsegoffset, is_ddense, 
-            Ss[:, 1:(nseg - segrank)], 
-            Ds[:, 1:(nsubseg - subsegrank)]
+            bits,
+            pop,
+            segstart,
+            is_dense,
+            subsegoffset,
+            is_ddense,
+            Ss[:, 1:(nseg-segrank)],
+            Ds[:, 1:(nsubseg-subsegrank)],
         )
     end
 
 end
 
-BitVectorRSA(bits::T) where T <: AbstractVector = BitVectorRSA(convert(BitVector, bits))
+BitVectorRSA(bits::T) where {T<:AbstractVector} = BitVectorRSA(convert(BitVector, bits))
 
 # Indexing: 
 Base.getindex(A::BitVectorRSA, i) = getindex(A.bits, i)
@@ -344,7 +349,7 @@ function select_unsafe(v::AbstractBitVectorRSA, j::Integer)
         offset = v.Ss[jj, isegsparse]
         return segstart + offset
     end
-    
+
     # bit in Dense-sparse sub-segment:
     relsubseg, jj = index_in_interval(jj, SUBSEG_POPULATION)
     isubseg = isegsparse * N_SUBSEG_PER_SEG + relsubseg
@@ -358,9 +363,8 @@ function select_unsafe(v::AbstractBitVectorRSA, j::Integer)
 
     # bit in Dense-dense subsegment: 
     pos = segstart + subsegoffset - 1
-    for _ in 1:jj
+    for _ = 1:jj
         pos = findnext(v.bits, pos + 1)
     end
     return pos
 end
-

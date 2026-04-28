@@ -2,10 +2,10 @@ using Random
 using Test
 using GSAD
 
-include("TestUtils.jl")
+include("TestUtils.jl")#= RakedBitVector =#
 
 
-#= RakedBitVector =#
+
 
 @testset "BitVectorRA()" begin
     bitvector = BitVector([1, 0, 0])
@@ -28,10 +28,7 @@ include("TestUtils.jl")
     @test length(v.chunks) == cld(length(v), GSAD.WIDTH_CHUNK)
     @test length(v.blocks) == cld(length(v), GSAD.WIDTH_BLOCK)
     blocks = UInt32[0, 256, 512, 640]
-    chunks = UInt8[
-        0, 64, 128, 192, 0, 64, 128, 192,
-        0, 32, 64, 96, 0, 32, 64, 96
-    ]
+    chunks = UInt8[0, 64, 128, 192, 0, 64, 128, 192, 0, 32, 64, 96, 0, 32, 64, 96]
     @test v.chunks == chunks
     @test v.blocks == blocks
 end

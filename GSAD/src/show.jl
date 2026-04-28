@@ -19,9 +19,9 @@ function Base.show(io::IO, mime::MIME"text/plain", x::BitVectorRSA)
     text = [
         "BitVectorRSA:",
         "\n",
-        "    len: $(length(x.bits))", 
-        "\n", 
-        "    pop: $(Int(x.population))"
+        "    len: $(length(x.bits))",
+        "\n",
+        "    pop: $(Int(x.population))",
     ]
     println(io, reduce(*, text))
 end

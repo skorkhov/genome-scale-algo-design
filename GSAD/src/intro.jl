@@ -2,26 +2,26 @@ using Random
 using StatsBase
 
 protein_codon_dict = Dict(
-    'A' => ["GCT", "GCC", "GCA", "GCG"], 
+    'A' => ["GCT", "GCC", "GCA", "GCG"],
     'R' => ["CGT", "CGC", "CGA", "CGG", "AGA", "AGG"],
     'N' => ["AAT", "AAC"],
     'D' => ["GAT", "GAC"],
     'C' => ["TGT", "TGC"],
     'Q' => ["CAA", "CAG"],
     'E' => ["GAA", "GAG"],
-    'G' => ["GGT", "GGC", "GGA", "GGG"], 
+    'G' => ["GGT", "GGC", "GGA", "GGG"],
     'H' => ["CAT", "CAC"],
-    'I' => ["ATT", "ATC", "ATA"], 
+    'I' => ["ATT", "ATC", "ATA"],
     'L' => ["CTT", "CTC", "CTA", "CTG", "TTA", "TTG"],
     'K' => ["AAA", "AAG"],
-    'M' => ["ATG"], 
+    'M' => ["ATG"],
     'F' => ["TTT", "TTC"],
-    'P' => ["CCT", "CCC", "CCA", "CCG"], 
-    'S' => ["TCT", "TCC", "TCA", "TCG", "AGT", "AGC"], 
-    'T' => ["ACT", "ACC", "ACA", "ACG"], 
-    'W' => ["TGG"], 
-    'Y' => ["TAT", "TAC"], 
-    'V' => ["GTT", "GTC", "GTA", "GTG"]
+    'P' => ["CCT", "CCC", "CCA", "CCG"],
+    'S' => ["TCT", "TCC", "TCA", "TCG", "AGT", "AGC"],
+    'T' => ["ACT", "ACC", "ACA", "ACG"],
+    'W' => ["TGG"],
+    'Y' => ["TAT", "TAC"],
+    'V' => ["GTT", "GTC", "GTA", "GTG"],
 )
 
 function translate(codon)
@@ -73,16 +73,22 @@ Given S that encodes P and f(S)=mean(z(XY)) for all consecutive pairs XY in S,
 compute codon permutation S' of S such that f(S') < f(S).
 =#
 function exercise_13(exon)
-    codons = [exon[i:i+2] for i in 1:3:length(exon) if i+2 <= length(exon)]
-    codon_pairs = zip(codons[1:end-1], codons[2:end])
+    codons = [exon[i:(i+2)] for i = 1:3:length(exon) if i+2 <= length(exon)]
+    codon_pairs = zip(codons[1:(end-1)], codons[2:end])
     codon_pairs_freq = StatsBase.countmap(codon_pairs)
-    codon_pairs_prob = Dict(keys(codon_pairs_freq) .=> collect(values(codon_pairs_freq)) / sum(values(codon_pairs_freq)))
+    codon_pairs_prob = Dict(
+        keys(codon_pairs_freq) .=>
+            collect(values(codon_pairs_freq)) / sum(values(codon_pairs_freq)),
+    )
     @show collect(codon_pairs)
 
     aacids = translate.(codons)
-    aacid_pairs = zip(aacids[1:end-1], aacids[2:end])
+    aacid_pairs = zip(aacids[1:(end-1)], aacids[2:end])
     aacid_pairs_freq = StatsBase.countmap(aacid_pairs)
-    aacid_pairs_prob = Dict(keys(aacid_pairs_freq) .=> collect(values(aacid_pairs_freq)) / sum(values(aacid_pairs_freq)))
+    aacid_pairs_prob = Dict(
+        keys(aacid_pairs_freq) .=>
+            collect(values(aacid_pairs_freq)) / sum(values(aacid_pairs_freq)),
+    )
     @show collect(aacid_pairs)
 
     function expected_codon_pair_prob(codon_pair, aacid_pairs_prob = aacid_pairs_prob)
@@ -94,9 +100,13 @@ function exercise_13(exon)
 
         codon_pair_prob
     end
-    
-    expected_probs = Dict(keys(codon_pairs_prob) .=> expected_codon_pair_prob.(keys(codon_pairs_prob)))
-    observed_vs_expected_ratio = Dict(keys(codon_pairs_prob) .=> collect(values(codon_pairs_prob)) ./ values(expected_probs))
+
+    expected_probs =
+        Dict(keys(codon_pairs_prob) .=> expected_codon_pair_prob.(keys(codon_pairs_prob)))
+    observed_vs_expected_ratio = Dict(
+        keys(codon_pairs_prob) .=>
+            collect(values(codon_pairs_prob)) ./ values(expected_probs),
+    )
 
     observed_vs_expected_ratio
 end

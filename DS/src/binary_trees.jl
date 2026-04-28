@@ -6,15 +6,15 @@ import Base: push!, get, pop!
 mutable struct BSTNodeSelf{T} <: AbstractNode
     left::BSTNodeSelf{T}
     right::BSTNodeSelf{T}
-    key::T 
-    value
+    key::T
+    value::Any
 
     # an empty node references itself and has undefined key and value
-    function BSTNodeSelf{T}(key, value) where T
+    function BSTNodeSelf{T}(key, value) where {T}
         node = new()
         node.key = key
         node.value = value
-        
+
         # point to itself: 
         node.left = node
         node.right = node
@@ -22,18 +22,20 @@ mutable struct BSTNodeSelf{T} <: AbstractNode
         node
     end
 
-    BSTNodeSelf{T}(left, right, key, val) where T = new(left, right, key, val)
+    BSTNodeSelf{T}(left, right, key, val) where {T} = new(left, right, key, val)
 end
 
-BSTNodeSelf(key::T, value) where T = BSTNodeSelf{T}(key, value)
+BSTNodeSelf(key::T, value) where {T} = BSTNodeSelf{T}(key, value)
 
 is_leaf(current::BSTNodeSelf, next::BSTNodeSelf) = next === current
 
 function find_node(node::AbstractNode, key)
     while node.key != key
         next = key < node.key ? node.left : node.right
-        if is_leaf(node, next) return node end
-        node = next 
+        if is_leaf(node, next)
+            return node
+        end
+        node = next
     end
 
     node
@@ -44,18 +46,18 @@ function get(node::BSTNodeSelf, key)
     node.key == key ? node.value : nothing
 end
 
-function push!(root::BSTNodeSelf{T}, key::T, value) where T
+function push!(root::BSTNodeSelf{T}, key::T, value) where {T}
     node = find_node(root, key)
     if key == node.key
         node.value = value
         return root
     end
-    
+
     leaf = BSTNodeSelf(key, value)
 
-    if key < node.key 
-        node.left = leaf 
-    else 
+    if key < node.key
+        node.left = leaf
+    else
         node.right = leaf
     end
 
@@ -89,13 +91,13 @@ function pop_recursive!(node::BSTNodeSelf, key)
 end
 """
 
-function find_parent(root, node) 
+function find_parent(root, node)
     key = node.key
     node_exists = find_node(root, key) === node
     node_exists || throw(ErrorException("node does not exist in tree at root"))
     # parent of root is nothing: 
     key == root.key && return nothing
-    
+
     curr = root
     next = key < curr.key ? curr.left : curr.right
     while next !== node
@@ -119,12 +121,12 @@ function popmin!(root::BSTNodeSelf)
     toreset = find_parent(root, toremove)
 
     toreset.left = is_leaf(toremove, toremove.right) ? toreset : toremove.right
-    
+
     root
 end
 
 # Returns value associated with the key and removes it from the tree
-function pop!(node::BSTNodeSelf{T}, key::T) where T
+function pop!(node::BSTNodeSelf{T}, key::T) where {T}
     toremove = find_node(node, key)
     toremove.key == key || return nothing
 
@@ -153,16 +155,16 @@ end
 # BST Node with nothing links
 
 mutable struct BSTNode{T} <: AbstractNode
-    left::Union{Nothing, BSTNode{T}}
-    right::Union{Nothing, BSTNode{T}}
-    key::T 
-    value
+    left::Union{Nothing,BSTNode{T}}
+    right::Union{Nothing,BSTNode{T}}
+    key::T
+    value::Any
 
-    BSTNode{T}(key, value) where T = new{T}(nothing, nothing, key, value)
-    BSTNode{T}(left, right, key, val) where T = new{T}(left, right, key, val)
+    BSTNode{T}(key, value) where {T} = new{T}(nothing, nothing, key, value)
+    BSTNode{T}(left, right, key, val) where {T} = new{T}(left, right, key, val)
 end
 
-BSTNode(key::T, value) where T = BSTNode{T}(key, value)
+BSTNode(key::T, value) where {T} = BSTNode{T}(key, value)
 
 is_leaf(current::BSTNode, next) = next === nothing
 
@@ -171,21 +173,21 @@ function get(node::BSTNode, key)
     candidate.key === key ? candidate.value : nothing
 end
 
-function find_min(node::BSTNode) 
+function find_min(node::BSTNode)
     while node.left !== nothing
         node = node.left
-    end 
+    end
     node
 end
 
 # recursive push
-function pushrec!(node::Union{BSTNode{T}, Nothing}, key::T, value) where T
+function pushrec!(node::Union{BSTNode{T},Nothing}, key::T, value) where {T}
     node === nothing && return BSTNode(key, value)
-    if key < node.key 
+    if key < node.key
         node.left = pushrec!(node.left, key, value)
     elseif key > node.key
         node.right = pushrec!(node.right, key, value)
-    else 
+    else
         node.value = value
     end
 
@@ -194,7 +196,7 @@ end
 
 # non-recursive push
 # uses find_node() generic
-function push!(node::BSTNode{T}, key::T, value) where T
+function push!(node::BSTNode{T}, key::T, value) where {T}
     current = find_node(node, key)
     if key == current.key
         current.value = value
@@ -208,7 +210,7 @@ function push!(node::BSTNode{T}, key::T, value) where T
 end
 
 # return the whole subtree with popped minimum node: 
-function popmin!(node::BSTNode) 
+function popmin!(node::BSTNode)
     parent = node
     current = node.left
     current === nothing && throw(ErrorException("mis is root; cannot remove root"))
@@ -219,12 +221,12 @@ function popmin!(node::BSTNode)
         current = current.left
     end
     parent.left = current.right
-    
+
     current
 end
 
 # non-recursive pop
-function pop!(node::BSTNode{T}, key::T) where T
+function pop!(node::BSTNode{T}, key::T) where {T}
     node.key == key && throw(ErrorException("cannot pop root"))
     parent = next = node
     # look for node that needs to be removed
@@ -236,11 +238,11 @@ function pop!(node::BSTNode{T}, key::T) where T
 
     # found node to delete: next.key == key
     which_remove_in_parent = parent.left === next ? :left : :right
-    if next.right === nothing 
+    if next.right === nothing
         setfield!(parent, which_remove_in_parent, next.left)
     elseif next.left === nothing
         setfield!(parent, which_remove_in_parent, next.right)
-    else 
+    else
         # TODO: fix popmin! to return whole subtree:
         rightmin = popmin!(next.right)
         rightmin.right = next.right
@@ -256,7 +258,7 @@ end
 # needs a separate function to return the popped node, 
 # and a high-lvl function to unwrap the value associated with the node
 
-function poprec_min!(node::BSTNode) 
+function poprec_min!(node::BSTNode)
     # node.left === nothing && return node.right 
     if node.left === nothing
         @show node.value  # printing is the only option to see val in recursion
@@ -270,22 +272,22 @@ function poprec_min!(node::BSTNode)
     return node
 end
 
-function poprec!(node::BSTNode{T}, key::T) where T
+function poprec!(node::BSTNode{T}, key::T) where {T}
     node === nothing && return nothing
-    
+
     @show node.value
-    if key < node.key 
-        node.left = poprec!(node.left, key) 
+    if key < node.key
+        node.left = poprec!(node.left, key)
     elseif key > node.key
         node.right = poprec!(node.right, key)
-    else 
+    else
         # key == node.key
         # return a new subtree in place of the node: 
-        
+
         # if only one child, simply return it: 
         node.right === nothing && return node.left
         node.left === nothing && return node.right
-        
+
         # if noth children exist
         # construct a new node: 
         rightmin = find_min(node.right)
@@ -295,4 +297,4 @@ function poprec!(node::BSTNode{T}, key::T) where T
     end
 
     return node
-end 
+end

@@ -6,7 +6,7 @@
 # =======
 # src implementation
 
-function newempty1(a::AbstractVector{T}, ::Type{U}=T) where {T,U}
+function newempty1(a::AbstractVector{T}, ::Type{U} = T) where {T,U}
     @show U, Type{U}, T, Type{T}
     Vector{U}()
 end
@@ -23,7 +23,7 @@ newempty1([1, 2, 3], Float64)
 # container elements are declared types (i.e. DataType);
 # they can also be UnionAll or Union types.
 
-function newempty2(a::AbstractVector{T}, U::DataType=T) where T
+function newempty2(a::AbstractVector{T}, U::DataType = T) where {T}
     @show U, Type{U}, T, Type{T}
     Vector{U}()
 end
@@ -44,7 +44,7 @@ newempty2([1, 2, 3], Vector)
 # which ends up as the container type of the new vector
 
 # doesn't work because in f(Int::U), U becomes DataType
-function newempty3(a::AbstractVector{T}, ::U=T) where {T, U}
+function newempty3(a::AbstractVector{T}, ::U = T) where {T,U}
     @show U, Type{U}, T, Type{T}
     Vector{U}()
 end
@@ -57,7 +57,7 @@ newempty3([1, 2, 3], Float64)
 # Equivalent (?) definition
 # (not idiomatic)
 
-function newempty4(a::AbstractVector{T}, U::Type=T) where T
+function newempty4(a::AbstractVector{T}, U::Type = T) where {T}
     @show U, Type{U}, T, Type{T}
     Vector{U}()
 end
@@ -68,5 +68,5 @@ newempty4([1, 2, 3], Float64)
 newempty4([1, 2, 3], Vector)
 empty([1, 2, 3], Vector)
 # works with Union:
-newempty4([1, 2, 3], Union{Int, String})
-empty([1, 2, 3], Union{Int, String})
+newempty4([1, 2, 3], Union{Int,String})
+empty([1, 2, 3], Union{Int,String})

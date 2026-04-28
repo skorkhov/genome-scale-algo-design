@@ -4,10 +4,10 @@ using Random
 using Test
 using GSAD
 
-include("TestUtils.jl")
+include("TestUtils.jl")#= BitVectorSA =#
 
 
-#= BitVectorSA =#
+
 
 @testset "partition(::Vector)" begin
     partition = GSAD.partition
@@ -24,12 +24,12 @@ end
 
 @testset "select(::BitVectorSA, j)" begin
     # Dd + S + D(d/s)
-    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i = 1:40])
     bv_subseg_Dd = trues(8)
     bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
     bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
     bv = BitVectorSA([trues(4096); bv_seg_S; bv_seg_D_mixed])
-    
+
     @test select(bv, 4096) == 4096
     @test select(bv, 4096 + 4095) == 4096 + 4095
     @test select(bv, 4096 + 4096) == 4096 + 64^4
@@ -37,10 +37,10 @@ end
 
     # test bounds error:
     @test_throws BoundsError select(bv, 4096 * 3 + 1)
-end
+end#=  LayoutIntRank =#
 
 
-#=  LayoutIntRank =#
+
 
 @testset "LayoutIntRank" begin
     SegmentIntRank = GSAD.SegmentIntRank
@@ -48,59 +48,55 @@ end
     LayoutIntRank = GSAD.LayoutIntRank
 
     # Dd + S + D(d/s)
-    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i = 1:40])
     bv_subseg_Dd = trues(8)
     bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
     bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
     bv = [trues(4096); bv_seg_S; bv_seg_D_mixed]
 
     layout = LayoutIntRank(bv)
-    segments = map(
-        SegmentIntRank, 
-        [1, 4096 + 1, 4096 + 64^4 + 1],
-        [1, 1, 2],
-        [true, false, true]
-    )
+    segments =
+        map(SegmentIntRank, [1, 4096 + 1, 4096 + 64^4 + 1], [1, 1, 2], [true, false, true])
     subsegments = map(
-        SubsegmentIntRank, 
-        [[0:8:4095...]; vcat([[0, 8] .+ 48 * i for i in 0:255]...)], 
-        [1:512...; 512 .+ repeat(1:256, inner = 2)], 
-        [repeat([true], 512); repeat([true, false], 256)]
+        SubsegmentIntRank,
+        [[0:8:4095...]; vcat([[0, 8] .+ 48 * i for i = 0:255]...)],
+        [1:512...; 512 .+ repeat(1:256, inner = 2)],
+        [repeat([true], 512); repeat([true, false], 256)],
     )
 
     @test layout.segments == segments
     @test layout.subsegments == subsegments
-end
+end#= BitVectorRSA =#
 
 
-#= BitVectorRSA =#
+
 
 @testset "BitVectorRSA()" begin
 
     # Dd + S + D(d/s)
-    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i = 1:40])
     bv_subseg_Dd = trues(8)
     bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
     bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]
     bv = [
-        trues(4096); 
-        bv_seg_S; 
+        trues(4096);
+        bv_seg_S;
         bv_seg_D_mixed
     ]
     res = BitVectorRSA(bv)
     @test res.bits == bv
     # layout: 
     @test res.is_dense == BitVectorRA(BitVector([1, 0, 1]))
-    @test res.segstart == UInt64[1, 4097, 4096 + 64^4 + 1]
-    @test res.is_ddense == BitVectorRA([trues(512); [i % 2 == 1 for i in 1:512]])
+    @test res.segstart == UInt64[1, 4097, 4096+64^4+1]
+    @test res.is_ddense == BitVectorRA([trues(512); [i % 2 == 1 for i = 1:512]])
     exp = UInt32[
         [0:8:4095...];
-        vcat([[0, 8] .+ 48 * i for i in 0:255]...)
+        vcat([[0, 8] .+ 48 * i for i = 0:255]...)
     ]
     @test res.subsegoffset == exp
     # caches: 
     @test res.Ss == reshape([0:4094..., 64^4 - 1], (4096, 1))
-    @test res.Ds == reshape(repeat([5i for i in 0:7], 256), (8, 256))
+    @test res.Ds == reshape(repeat([5i for i = 0:7], 256), (8, 256))
 
     # all bits are 0: 
     bv = falses(4096 * 2)
@@ -118,7 +114,7 @@ end
 
 @testset "select(::BitVectorRSA, j)" begin
     # Dd + S + D(d/s)
-    bv_subseg_Ds = BitVector([i % 5 == 1 for i in 1:40])
+    bv_subseg_Ds = BitVector([i % 5 == 1 for i = 1:40])
     bv_subseg_Dd = trues(8)
     bv_seg_D_mixed = repeat([bv_subseg_Dd; bv_subseg_Ds], div(4096, 8 * 2))
     bv_seg_S = [trues(4095); falses(64^4 - 4096); trues(1)]

@@ -138,7 +138,7 @@ letters = Dict(i => ('A':'Z')[i] for i in sample(1:26, 26, replace = false))
 
 # ordered input:
 tree = ds.RBTreeNode(0, '_')
-for (key, val) in Dict(i => ('a':'z')[i] for i in 1:3)
+for (key, val) in Dict(i => ('a':'z')[i] for i = 1:3)
     tree = ds.pushr!(tree, key, val)
 end
 tree.color = false

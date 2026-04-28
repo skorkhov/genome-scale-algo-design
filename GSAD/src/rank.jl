@@ -9,26 +9,26 @@ struct BitVectorRA <: AbstractBitVectorRA
     blocks::Vector{UInt32}
     chunks::Vector{UInt8}
 
-    function BitVectorRA(bits::BitVector) 
+    function BitVectorRA(bits::BitVector)
         n = length(bits)
         n_chunks = cld(n, WIDTH_CHUNK)
         n_blocks = cld(n, WIDTH_BLOCK)
         # init lookup tables
         blocks = Vector{UInt32}(undef, n_blocks)
         chunks = Vector{UInt8}(undef, n_chunks)
-    
-        r_tot = 0 
+
+        r_tot = 0
         r_rel = 0
-        for i_chunk in 1:n_chunks
+        for i_chunk = 1:n_chunks
             chunk_offset_in_block = (i_chunk - 1) % CHUNKS_PER_BLOCK
             bits_in_chunk = count_ones(bits.chunks[i_chunk])
-            
-            if chunk_offset_in_block == 0 
+
+            if chunk_offset_in_block == 0
                 i_block = cld(i_chunk, CHUNKS_PER_BLOCK)
                 blocks[i_block] = r_tot & maskr(UInt64, 32)
                 chunks[i_chunk] = (r_tot >>> 32) % UInt8
                 r_rel = 0
-            else 
+            else
                 chunks[i_chunk] = r_rel
             end
 
@@ -36,7 +36,7 @@ struct BitVectorRA <: AbstractBitVectorRA
             r_tot += bits_in_chunk
             r_rel += bits_in_chunk
         end
-    
+
         new(bits, blocks, chunks)
     end
 end
@@ -44,7 +44,7 @@ end
 Base.length(x::AbstractBitVectorRA) = length(x.bits)
 Base.size(x::AbstractBitVectorRA) = (length(x),)
 Base.convert(::Type{BitVector}, x::AbstractBitVectorRA) = x.bits
-Base.convert(::Type{T}, x::BitVector) where T <: AbstractBitVectorRA = BitVectorRA(x)
+Base.convert(::Type{T}, x::BitVector) where {T<:AbstractBitVectorRA} = BitVectorRA(x)
 
 Base.getindex(A::AbstractBitVectorRA, i::Integer) = Base.getindex(A.bits, i)
 Base.firstindex(A::AbstractBitVectorRA) = firstindex(A.bits)
@@ -61,7 +61,7 @@ function rank(v::AbstractBitVectorRA, i::Integer)
     if i < 0 || length(v) < i
         throw(BoundsError(v, i))
     end
-    
+
     return rank_unsafe(v, i)
 end
 
@@ -72,11 +72,11 @@ function rank_unsafe(v::AbstractBitVectorRA, i::Integer)
 
     chunk_offset_in_block = (i_chunk - 1) % CHUNKS_PER_BLOCK
     @inbounds r = (
-        convert(Int, v.chunks[i_chunk - chunk_offset_in_block]) << 32 +
-        v.blocks[i_block] + 
+        convert(Int, v.chunks[i_chunk-chunk_offset_in_block]) << 32 +
+        v.blocks[i_block] +
         count_ones(chunk & maskr(typeof(chunk), (i - 1) % WIDTH_CHUNK + 1))
     )
-    if chunk_offset_in_block != 0 
+    if chunk_offset_in_block != 0
         @inbounds r += v.chunks[i_chunk]
     end
 
@@ -104,7 +104,8 @@ function select(v::AbstractBitVectorRA, j)
         # ensure correct index always stays in [lo, hi]
         if r >= j
             hi = mid
-        else r < j
+        else
+            r < j
             lo = mid + 1
         end
     end

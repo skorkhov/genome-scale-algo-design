@@ -53,4 +53,3 @@ A['e'] = -99
 @test A['e'] == -99
 @test rmq(A, 'd', 'f') == (-99, 'e')
 @test_throws KeyError A['A']
-

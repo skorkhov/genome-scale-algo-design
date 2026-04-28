@@ -1,8 +1,8 @@
 using GSAD
 using Test
-using Random
+using Random#= test calls =#
 
-#= test calls =#
+
 
 @testset "Slow Reference Implementations" include("test-reference.jl")
 @testset "bit utils" include("test-bitutils.jl")
@@ -11,4 +11,3 @@ using Random
 @testset "BitVectorSA" include("test-select.jl")
 @testset "Search Trees" include("test-bst.jl")
 @testset "Edit Distance" include("test-editdist.jl")
-
